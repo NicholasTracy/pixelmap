@@ -125,9 +125,24 @@ void pm_pixel_map_normalize(pm_pixel_map_t *map)
     float minz = map->pixels[0].pos.z, maxz = minz;
     for (uint16_t i = 1; i < map->count; ++i) {
         pm_vec3_t p = map->pixels[i].pos;
-        if (p.x < minx) minx = p.x; if (p.x > maxx) maxx = p.x;
-        if (p.y < miny) miny = p.y; if (p.y > maxy) maxy = p.y;
-        if (p.z < minz) minz = p.z; if (p.z > maxz) maxz = p.z;
+        if (p.x < minx) {
+            minx = p.x;
+        }
+        if (p.x > maxx) {
+            maxx = p.x;
+        }
+        if (p.y < miny) {
+            miny = p.y;
+        }
+        if (p.y > maxy) {
+            maxy = p.y;
+        }
+        if (p.z < minz) {
+            minz = p.z;
+        }
+        if (p.z > maxz) {
+            maxz = p.z;
+        }
     }
     float dx = maxx - minx; if (dx < 1e-6f) dx = 1.0f;
     float dy = maxy - miny; if (dy < 1e-6f) dy = 1.0f;
