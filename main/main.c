@@ -12,6 +12,7 @@
 #include "web_ui.h"
 #include "artnet.h"
 #include "sacn.h"
+#include "status_led.h"
 
 static const char *TAG = "pixelmap";
 
@@ -21,6 +22,7 @@ static pm_pixel_map_t *s_map;
 static uint8_t *s_dmx_merge;
 static size_t s_dmx_merge_len;
 static volatile bool s_rebuild;
+static volatile bool s_strip_fault;
 
 static void apply_correction(void)
 {
@@ -52,14 +54,42 @@ static esp_err_t rebuild_strip(void)
     esp_err_t err = pm_led_strip_create(&sc, &s_strip);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "strip create failed: %s", esp_err_to_name(err));
+        s_strip_fault = true;
         return err;
     }
+    s_strip_fault = false;
     apply_correction();
 
     free(s_dmx_merge);
     s_dmx_merge_len = (size_t)s_cfg.pixel_count * 3;
     s_dmx_merge = calloc(1, s_dmx_merge_len);
     return ESP_OK;
+}
+
+static void update_status_led(bool dmx_active)
+{
+    if (s_strip_fault) {
+        pm_status_led_set_mode(PM_STATUS_FAULT_STRIP);
+        return;
+    }
+    if (dmx_active) {
+        pm_status_led_set_mode(PM_STATUS_DMX_ACTIVE);
+        return;
+    }
+    if (pm_wifi_sta_connected()) {
+        pm_status_led_set_mode(PM_STATUS_OK);
+        return;
+    }
+    if (pm_wifi_ap_active()) {
+        /* Prefer AP indication when serving setup network */
+        pm_status_led_set_mode(PM_STATUS_WIFI_AP);
+        return;
+    }
+    if (pm_wifi_sta_connecting()) {
+        pm_status_led_set_mode(PM_STATUS_WIFI_CONNECTING);
+        return;
+    }
+    pm_status_led_set_mode(PM_STATUS_WIFI_AP);
 }
 
 static void on_config_changed(void)
@@ -134,9 +164,13 @@ static void render_loop(void *arg)
             pm_effect_render(&ctx, set_px, NULL);
         }
 
-        if (s_strip) {
-            pm_led_strip_show(s_strip);
+        if (s_strip && pm_led_strip_show(s_strip) != ESP_OK) {
+            s_strip_fault = true;
         }
+
+        update_status_led(net);
+        pm_status_led_tick();
+
         vTaskDelay(pdMS_TO_TICKS(16)); /* ~60 FPS */
     }
 }
@@ -151,6 +185,16 @@ void app_main(void)
 
     ESP_ERROR_CHECK(pm_config_load(&s_cfg));
 
+    pm_status_led_config_t sled = {
+        .gpio = s_cfg.gpio_status_led,
+        .active_high = s_cfg.status_led_active_high,
+        .avoid_gpio_a = s_cfg.gpio_data,
+        .avoid_gpio_b = s_cfg.gpio_clock,
+    };
+    ESP_ERROR_CHECK(pm_status_led_init(&sled));
+    pm_status_led_set_mode(PM_STATUS_BOOT);
+    pm_status_led_tick();
+
     pm_pixel_map_config_t mc = {
         .capacity = s_cfg.pixel_count > 0 ? s_cfg.pixel_count : 512,
         .width = 1, .height = 1, .depth = 1,
@@ -162,7 +206,9 @@ void app_main(void)
     ESP_ERROR_CHECK(pm_pixel_map_build_grid(s_map, s_cfg.map_width, s_cfg.map_height, 1.0f, 0));
     pm_pixel_map_normalize(s_map);
 
-    ESP_ERROR_CHECK(rebuild_strip());
+    if (rebuild_strip() != ESP_OK) {
+        pm_status_led_set_mode(PM_STATUS_FAULT_STRIP);
+    }
 
     pm_wifi_config_t wifi = {
         .sta_ssid = s_cfg.sta_ssid,
@@ -171,6 +217,7 @@ void app_main(void)
         .ap_fallback = s_cfg.ap_fallback,
     };
     ESP_ERROR_CHECK(pm_wifi_start(&wifi));
+    pm_status_led_set_mode(s_cfg.sta_ssid[0] ? PM_STATUS_WIFI_CONNECTING : PM_STATUS_WIFI_AP);
 
     pm_web_ui_hooks_t ui = {
         .cfg = &s_cfg,

@@ -9,6 +9,8 @@
 
 static const char *TAG = "wifi";
 static bool s_sta_up;
+static bool s_ap_up;
+static bool s_sta_connecting;
 static char s_ip[16] = "0.0.0.0";
 static bool s_ap_fallback;
 static char s_ssid[33];
@@ -27,6 +29,7 @@ static void start_ap(void)
     ap.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap));
+    s_ap_up = true;
     ESP_LOGI(TAG, "AP %s / pixelmap1", ap.ap.ssid);
     strncpy(s_ip, "192.168.4.1", sizeof(s_ip) - 1);
 }
@@ -34,14 +37,19 @@ static void start_ap(void)
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
-        if (s_ssid[0]) esp_wifi_connect();
+        if (s_ssid[0]) {
+            s_sta_connecting = true;
+            esp_wifi_connect();
+        }
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         s_sta_up = false;
+        s_sta_connecting = s_ssid[0] != 0;
         if (s_ap_fallback) start_ap();
         if (s_ssid[0]) esp_wifi_connect();
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *e = data;
         s_sta_up = true;
+        s_sta_connecting = false;
         snprintf(s_ip, sizeof(s_ip), IPSTR, IP2STR(&e->ip_info.ip));
         ESP_LOGI(TAG, "STA IP %s", s_ip);
     }
@@ -69,6 +77,7 @@ esp_err_t pm_wifi_start(const pm_wifi_config_t *cfg)
         strncpy((char *)sta.sta.ssid, s_ssid, sizeof(sta.sta.ssid) - 1);
         strncpy((char *)sta.sta.password, s_pass, sizeof(sta.sta.password) - 1);
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta));
+        s_sta_connecting = true;
     } else {
         start_ap();
     }
@@ -81,4 +90,6 @@ esp_err_t pm_wifi_start(const pm_wifi_config_t *cfg)
 }
 
 bool pm_wifi_sta_connected(void) { return s_sta_up; }
+bool pm_wifi_ap_active(void) { return s_ap_up; }
+bool pm_wifi_sta_connecting(void) { return s_sta_connecting && !s_sta_up; }
 const char *pm_wifi_ip_str(void) { return s_ip; }

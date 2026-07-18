@@ -49,6 +49,12 @@ button.primary{background:linear-gradient(180deg,#2d6b52,#1f4a39);border-color:v
       <div><label>Data GPIO</label><input id="gpio" type="number"/></div>
     </div>
     <div class="row">
+      <div><label>Status LED GPIO (−1 = off)</label><input id="sled" type="number"/></div>
+      <div><label><input id="sledh" type="checkbox"/> Status LED active-high</label>
+        <p class="status">Default GPIO 2 = onboard LED on most WLED ESP32 boards</p>
+      </div>
+    </div>
+    <div class="row">
       <div><label>Chipset</label>
         <select id="chip">
           <option>WS2812B</option><option>WS2812</option><option>WS2811</option>
@@ -108,6 +114,7 @@ async function loadCfg(){
   const c = await r.json();
   ssid.value=c.ssid||''; pass.value=c.pass||''; host.value=c.host||'pixelmap';
   gpio.value=c.gpio; count.value=c.count; bri.value=c.bri; gamma.value=c.gamma;
+  sled.value=c.sled??2; sledh.checked=c.sledh!==false;
   chip.value=c.chip||'WS2812B'; fx.value=c.fx; speed.value=c.speed??1;
   aun.value=c.aun; sun.value=c.sun; aen.checked=!!c.aen; sen.checked=!!c.sen;
   mw.value=c.mw||10; mh.value=c.mh||6;
@@ -161,7 +168,8 @@ mapCanvas.ondblclick=e=>{
 saveCfg.onclick=async()=>{
   const body={
     ssid:ssid.value, pass:pass.value, host:host.value,
-    gpio:+gpio.value, count:+count.value, bri:+bri.value, gamma:+gamma.value,
+    gpio:+gpio.value, sled:+sled.value, sledh:sledh.checked,
+    count:+count.value, bri:+bri.value, gamma:+gamma.value,
     chip:chip.value, fx:+fx.value, speed:+speed.value,
     aun:+aun.value, sun:+sun.value, aen:aen.checked, sen:sen.checked,
     mw:+mw.value, mh:+mh.value

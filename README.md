@@ -196,11 +196,27 @@ PixelMap ships with pin defaults that match many WLED ESP32 layouts:
 | Function | ESP32 GPIO | Notes |
 |----------|------------|-------|
 | LED data (main) | 16 | Primary data line on many WLED boards |
-| LED data (optional 2nd) | 2 | Secondary output on some boards |
+| Status LED | 2 | Onboard LED on most ESP32 DevKit-style boards |
 | LED clock | 14 | For clocked chips such as APA102 / SK9822 |
 | Button | 0 | Boot / recovery style button |
 
 You can change the data pin in the web UI if your board uses a different layout.
+
+### Status LED meanings
+
+The onboard status LED (default **GPIO 2**) shows controller health at a glance:
+
+| Pattern | Meaning |
+|---------|---------|
+| Solid on | Booting |
+| Fast blink (~4×/sec) | Connecting to Wi‑Fi |
+| Slow blink (1×/sec) | Setup mode / PixelMap Wi‑Fi hotspot is on |
+| Short heartbeat every ~2.5s | Running normally (local effects) |
+| Medium blink (2×/sec) | Receiving Art-Net or sACN |
+| Very fast blink | LED strip/output fault |
+| SOS (`··· ——— ···`) | Serious configuration / startup fault |
+
+If you assign GPIO 2 as LED data instead, the status LED is disabled automatically so it does not fight the pixel bus.
 
 ---
 
@@ -246,6 +262,8 @@ PixelMap does not lock the board. To return to WLED:
 | Flasher cannot find the board | Try another USB cable/port, install/update the USB serial driver, and repeat the BOOT + RESET sequence |
 | Flash succeeds but no Wi‑Fi network appears | Confirm you used the **merged** image, power-cycle the board, and wait ~10 seconds |
 | Lights do not respond | Check data pin (often GPIO 16), LED type, pixel count, and that ground is shared between power supply and controller |
+| Onboard LED blinks very fast | LED output fault — check chipset/pin settings, then reboot |
+| Onboard LED blinks once per second | Controller is in setup hotspot mode (`PixelMap-XXXX`) |
 | Patterns look wrong spatially | Rebuild or drag-edit the pixel map so it matches the physical layout |
 | Want WLED back | Reflash WLED with your normal installer |
 

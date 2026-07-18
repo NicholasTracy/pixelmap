@@ -61,6 +61,8 @@ static esp_err_t h_get_config(httpd_req_t *req)
     cJSON_AddStringToObject(o, "pass", c->sta_pass);
     cJSON_AddStringToObject(o, "host", c->hostname);
     cJSON_AddNumberToObject(o, "gpio", c->gpio_data);
+    cJSON_AddNumberToObject(o, "sled", c->gpio_status_led);
+    cJSON_AddBoolToObject(o, "sledh", c->status_led_active_high);
     cJSON_AddNumberToObject(o, "count", c->pixel_count);
     cJSON_AddNumberToObject(o, "bri", c->brightness);
     cJSON_AddNumberToObject(o, "gamma", c->gamma);
@@ -92,6 +94,8 @@ static esp_err_t h_post_config(httpd_req_t *req)
     if ((v = cJSON_GetObjectItem(j, "host")) && cJSON_IsString(v))
         strncpy(c->hostname, v->valuestring, sizeof(c->hostname) - 1);
     if ((v = cJSON_GetObjectItem(j, "gpio")) && cJSON_IsNumber(v)) c->gpio_data = (int)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(j, "sled")) && cJSON_IsNumber(v)) c->gpio_status_led = (int)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(j, "sledh"))) c->status_led_active_high = cJSON_IsTrue(v);
     if ((v = cJSON_GetObjectItem(j, "count")) && cJSON_IsNumber(v)) c->pixel_count = (uint16_t)v->valuedouble;
     if ((v = cJSON_GetObjectItem(j, "bri")) && cJSON_IsNumber(v)) c->brightness = (uint8_t)v->valuedouble;
     if ((v = cJSON_GetObjectItem(j, "gamma")) && cJSON_IsNumber(v)) c->gamma = (uint8_t)v->valuedouble;

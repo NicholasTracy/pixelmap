@@ -21,6 +21,8 @@ typedef struct {
 
     int gpio_data;
     int gpio_clock;
+    int gpio_status_led;      /* WLED-style onboard status LED; <0 disables */
+    bool status_led_active_high;
     pm_chipset_t chipset;
     pm_color_order_t color_order;
     uint16_t pixel_count;

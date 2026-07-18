@@ -32,6 +32,10 @@ Effects do **not** walk strip index as a 1D rainbow by default. They sample `pm_
 
 WS281x / SK6812 / TM1814 use the ESP32 **RMT** TX peripheral with nanosecond timing tables (`led_chipsets.c`). Bit patterns are DMA-friendly via `rmt_bytes_encoder`. APA102 / SK9822 are modeled as clocked buses (SPI host binding is the intended production path).
 
+## Status LED
+
+`status_led` drives the WLED-style onboard LED (default **GPIO 2**). Modes: boot, Wi‑Fi connecting, AP/setup, healthy heartbeat, DMX active, strip fault, SOS general fault. Automatically disabled if the pin conflicts with LED data/clock.
+
 ## Persistence
 
 `config_store` writes WiFi, strip, effect, and universe settings to NVS. Pixel maps are edited live through `/api/map` (persist map blobs to NVS/SPIFFS can be added next).

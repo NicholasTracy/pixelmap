@@ -3,11 +3,12 @@
   "chip": "esp32",
   "pins": {
     "led_data_1": 16,
-    "led_data_2": 2,
+    "led_data_2": -1,
     "led_clock": 14,
     "button": 0,
-    "status_led": -1
+    "status_led": 2
   },
+  "status_led_notes": "GPIO 2 is the ESP32 DevKit onboard LED used by many WLED boards. Disabled automatically if the same pin is chosen for LED data.",
   "defaults": {
     "chipset": "WS2812B",
     "color_order": "GRB",

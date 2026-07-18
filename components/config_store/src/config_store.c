@@ -12,6 +12,8 @@ void pm_config_set_defaults(pm_app_config_t *cfg)
     cfg->ap_fallback = true;
     cfg->gpio_data = 16;   /* WLED-style default */
     cfg->gpio_clock = 14;
+    cfg->gpio_status_led = 2; /* ESP32 DevKit / common WLED onboard LED */
+    cfg->status_led_active_high = true;
     cfg->chipset = PM_CHIPSET_WS2812B;
     cfg->color_order = PM_COLOR_ORDER_GRB;
     cfg->pixel_count = 60;
@@ -48,6 +50,8 @@ esp_err_t pm_config_load(pm_app_config_t *cfg)
     int32_t v;
     if (nvs_get_i32(h, "gpio", &v) == ESP_OK) cfg->gpio_data = v;
     if (nvs_get_i32(h, "clk", &v) == ESP_OK) cfg->gpio_clock = v;
+    if (nvs_get_i32(h, "sled", &v) == ESP_OK) cfg->gpio_status_led = v;
+    if (nvs_get_i32(h, "sledh", &v) == ESP_OK) cfg->status_led_active_high = v != 0;
     if (nvs_get_i32(h, "chip", &v) == ESP_OK) cfg->chipset = (pm_chipset_t)v;
     if (nvs_get_i32(h, "order", &v) == ESP_OK) cfg->color_order = (pm_color_order_t)v;
     if (nvs_get_i32(h, "count", &v) == ESP_OK) cfg->pixel_count = (uint16_t)v;
@@ -79,6 +83,8 @@ esp_err_t pm_config_save(const pm_app_config_t *cfg)
     nvs_set_str(h, "host", cfg->hostname);
     nvs_set_i32(h, "gpio", cfg->gpio_data);
     nvs_set_i32(h, "clk", cfg->gpio_clock);
+    nvs_set_i32(h, "sled", cfg->gpio_status_led);
+    nvs_set_i32(h, "sledh", cfg->status_led_active_high ? 1 : 0);
     nvs_set_i32(h, "chip", (int32_t)cfg->chipset);
     nvs_set_i32(h, "order", (int32_t)cfg->color_order);
     nvs_set_i32(h, "count", cfg->pixel_count);
