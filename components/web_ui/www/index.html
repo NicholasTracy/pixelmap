@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>PixelMap</title>
+<style>
+:root{
+  --bg:#0e1210; --panel:#171d1a; --ink:#e8f0ea; --muted:#8aa093;
+  --accent:#3dffa8; --line:#2a3530; --warn:#ffb454;
+  --font-display:"Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 600px at 10% -10%,#1a2a22,transparent),
+  radial-gradient(900px 500px at 100% 0%,#1a2230,transparent),var(--bg);
+  color:var(--ink);font:15px/1.45 var(--font-display)}
+header{padding:1.25rem 1.5rem;border-bottom:1px solid var(--line);display:flex;gap:1rem;align-items:baseline;flex-wrap:wrap}
+header h1{margin:0;font-size:1.6rem;letter-spacing:.04em;color:var(--accent)}
+header p{margin:0;color:var(--muted)}
+main{display:grid;grid-template-columns:1.1fr 1fr;gap:1rem;padding:1rem 1.5rem 2rem}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+section{background:rgba(23,29,26,.9);border:1px solid var(--line);padding:1rem 1.1rem}
+section h2{margin:0 0 .75rem;font-size:.95rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+label{display:block;margin:.55rem 0 .2rem;color:var(--muted);font-size:.85rem}
+input,select,button,textarea{width:100%;padding:.55rem .65rem;border:1px solid var(--line);
+  background:#0f1512;color:var(--ink);border-radius:0}
+button{cursor:pointer;background:linear-gradient(180deg,#244036,#1a2c26);border-color:#35584a;margin-top:.75rem}
+button.primary{background:linear-gradient(180deg,#2d6b52,#1f4a39);border-color:var(--accent);color:#d9ffe0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+#mapCanvas{width:100%;height:320px;background:#0a0e0c;border:1px solid var(--line);touch-action:none}
+.status{font-size:.85rem;color:var(--muted);margin-top:.5rem}
+.ok{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>PixelMap</h1>
+  <p>Spatial LED control · WiFi · Art-Net · sACN</p>
+</header>
+<main>
+  <section>
+    <h2>Device &amp; Strip</h2>
+    <div class="row">
+      <div><label>WiFi SSID</label><input id="ssid"/></div>
+      <div><label>WiFi Password</label><input id="pass" type="password"/></div>
+    </div>
+    <div class="row">
+      <div><label>Hostname</label><input id="host"/></div>
+      <div><label>Data GPIO</label><input id="gpio" type="number"/></div>
+    </div>
+    <div class="row">
+      <div><label>Chipset</label>
+        <select id="chip">
+          <option>WS2812B</option><option>WS2812</option><option>WS2811</option>
+          <option>WS2813</option><option>SK6812_RGBW</option><option>TM1814</option>
+          <option>APA102</option><option>SK9822</option>
+        </select>
+      </div>
+      <div><label>Pixels</label><input id="count" type="number" min="1" max="4096"/></div>
+    </div>
+    <div class="row">
+      <div><label>Brightness</label><input id="bri" type="range" min="1" max="255"/></div>
+      <div><label>Gamma (x100)</label><input id="gamma" type="number" min="100" max="300"/></div>
+    </div>
+    <div class="row">
+      <div><label>Effect</label>
+        <select id="fx">
+          <option value="0">Solid</option>
+          <option value="1">Rainbow Spatial</option>
+          <option value="2">Plasma</option>
+          <option value="3">Noise Field</option>
+          <option value="4">Radial Wave</option>
+          <option value="5">Plane Sweep</option>
+        </select>
+      </div>
+      <div><label>Effect Speed</label><input id="speed" type="number" step="0.1" min="0" max="10"/></div>
+    </div>
+    <div class="row">
+      <div><label>Art-Net Universe</label><input id="aun" type="number"/></div>
+      <div><label>sACN Universe</label><input id="sun" type="number"/></div>
+    </div>
+    <div class="row">
+      <label><input id="aen" type="checkbox"/> Art-Net enable</label>
+      <label><input id="sen" type="checkbox"/> sACN enable</label>
+    </div>
+    <button class="primary" id="saveCfg">Save settings</button>
+    <div class="status" id="cfgStatus"></div>
+  </section>
+  <section>
+    <h2>Pixel Map Editor</h2>
+    <div class="row">
+      <div><label>Grid W</label><input id="mw" type="number" min="1" max="128"/></div>
+      <div><label>Grid H</label><input id="mh" type="number" min="1" max="128"/></div>
+    </div>
+    <button id="buildGrid">Build grid map</button>
+    <canvas id="mapCanvas" width="640" height="320"></canvas>
+    <p class="status">Drag pixels to edit spatial positions. Double-click toggles group.</p>
+    <button class="primary" id="saveMap">Save map</button>
+    <div class="status" id="mapStatus"></div>
+  </section>
+</main>
+<script>
+let map = [];
+let drag = -1;
+
+async function loadCfg(){
+  const r = await fetch('/api/config');
+  const c = await r.json();
+  ssid.value=c.ssid||''; pass.value=c.pass||''; host.value=c.host||'pixelmap';
+  gpio.value=c.gpio; count.value=c.count; bri.value=c.bri; gamma.value=c.gamma;
+  chip.value=c.chip||'WS2812B'; fx.value=c.fx; speed.value=c.speed??1;
+  aun.value=c.aun; sun.value=c.sun; aen.checked=!!c.aen; sen.checked=!!c.sen;
+  mw.value=c.mw||10; mh.value=c.mh||6;
+}
+async function loadMap(){
+  const r = await fetch('/api/map');
+  map = await r.json();
+  draw();
+}
+function draw(){
+  const cv=mapCanvas, ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.strokeStyle='#2a3530';
+  for(let x=0;x<cv.width;x+=32){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,cv.height);ctx.stroke()}
+  for(let y=0;y<cv.height;y+=32){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cv.width,y);ctx.stroke()}
+  map.forEach((p,i)=>{
+    const x=p.x*cv.width, y=(1-p.y)*cv.height;
+    ctx.fillStyle = p.g? '#ffb454' : '#3dffa8';
+    ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2); ctx.fill();
+    if(i%Math.max(1,Math.floor(map.length/12))===0){
+      ctx.fillStyle='#8aa093'; ctx.fillText(String(p.i), x+7, y-7);
+    }
+  });
+}
+function hit(mx,my){
+  for(let i=0;i<map.length;i++){
+    const x=map[i].x*mapCanvas.width, y=(1-map[i].y)*mapCanvas.height;
+    if((x-mx)**2+(y-my)**2 < 100) return i;
+  }
+  return -1;
+}
+mapCanvas.onpointerdown=e=>{
+  const r=mapCanvas.getBoundingClientRect();
+  const mx=(e.clientX-r.left)*(mapCanvas.width/r.width);
+  const my=(e.clientY-r.top)*(mapCanvas.height/r.height);
+  drag=hit(mx,my); mapCanvas.setPointerCapture(e.pointerId);
+};
+mapCanvas.onpointermove=e=>{
+  if(drag<0) return;
+  const r=mapCanvas.getBoundingClientRect();
+  map[drag].x=Math.min(1,Math.max(0,(e.clientX-r.left)*(mapCanvas.width/r.width)/mapCanvas.width));
+  map[drag].y=Math.min(1,Math.max(0,1-(e.clientY-r.top)*(mapCanvas.height/r.height)/mapCanvas.height));
+  draw();
+};
+mapCanvas.onpointerup=()=>{drag=-1};
+mapCanvas.ondblclick=e=>{
+  const r=mapCanvas.getBoundingClientRect();
+  const i=hit((e.clientX-r.left)*(mapCanvas.width/r.width),(e.clientY-r.top)*(mapCanvas.height/r.height));
+  if(i>=0){ map[i].g = map[i].g?0:1; draw(); }
+};
+saveCfg.onclick=async()=>{
+  const body={
+    ssid:ssid.value, pass:pass.value, host:host.value,
+    gpio:+gpio.value, count:+count.value, bri:+bri.value, gamma:+gamma.value,
+    chip:chip.value, fx:+fx.value, speed:+speed.value,
+    aun:+aun.value, sun:+sun.value, aen:aen.checked, sen:sen.checked,
+    mw:+mw.value, mh:+mh.value
+  };
+  const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  cfgStatus.textContent = r.ok ? 'Saved. Reboot if WiFi/GPIO changed.' : 'Save failed';
+  cfgStatus.className='status '+(r.ok?'ok':'');
+};
+buildGrid.onclick=async()=>{
+  const r=await fetch('/api/map/grid',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({w:+mw.value,h:+mh.value})});
+  if(r.ok){ await loadMap(); mapStatus.textContent='Grid built'; mapStatus.className='status ok'; }
+};
+saveMap.onclick=async()=>{
+  const r=await fetch('/api/map',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(map)});
+  mapStatus.textContent=r.ok?'Map saved':'Map save failed';
+  mapStatus.className='status '+(r.ok?'ok':'');
+};
+loadCfg().then(loadMap);
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "WLED ESP32 Default",
+  "chip": "esp32",
+  "pins": {
+    "led_data_1": 16,
+    "led_data_2": 2,
+    "led_clock": 14,
+    "button": 0,
+    "status_led": -1
+  },
+  "defaults": {
+    "chipset": "WS2812B",
+    "color_order": "GRB",
+    "pixel_count": 60,
+    "max_ma": 4000
+  }
+}

@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify required project files
+        run: |
+          set -euo pipefail
+          for f in \
+            CMakeLists.txt \
+            sdkconfig.defaults \
+            partitions.csv \
+            main/CMakeLists.txt \
+            main/main.c \
+            README.md \
+            LICENSE
+          do
+            test -f "$f" || { echo "missing: $f"; exit 1; }
+          done
+
+      - name: Verify components exist
+        run: |
+          set -euo pipefail
+          for c in led_driver color mapping effects wifi_mgr web_ui artnet sacn config_store; do
+            test -f "components/$c/CMakeLists.txt" || { echo "missing component: $c"; exit 1; }
+          done
+
+      - name: Check for secrets / junk
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(\.env$|\.pem$|id_rsa|secrets\.|credentials\.json$)'; then
+            echo "Refusing to track secret-like files"
+            exit 1
+          fi
+
+      - name: Basic C hygiene
+        run: |
+          set -euo pipefail
+          # Fail if TODO(security) markers or obvious debug leftovers appear in shipping paths
+          if grep -RIn --include='*.c' --include='*.h' -E 'gets\(|strcpy\([^,]*,\s*[^)]*password' components main; then
+            echo "Potentially unsafe pattern found"
+            exit 1
+          fi
+          echo "Hygiene checks passed"
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [esp32, esp32s3]
+        idf_version: [v5.2.3]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build firmware
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ matrix.idf_version }}
+          target: ${{ matrix.target }}
+          path: '.'
+          command: idf.py build
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixelmap-${{ matrix.target }}-${{ matrix.idf_version }}
+          path: |
+            build/*.bin
+            build/*.elf
+            build/flasher_args.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  summary:
+    name: CI summary
+    needs: [lint, build]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check job results
+        run: |
+          echo "lint=${{ needs.lint.result }}"
+          echo "build=${{ needs.build.result }}"
+          test "${{ needs.lint.result }}" = "success"
+          test "${{ needs.build.result }}" = "success"
