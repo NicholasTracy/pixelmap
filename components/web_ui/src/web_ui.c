@@ -11,8 +11,8 @@ static const char *TAG = "web_ui";
 static httpd_handle_t s_server;
 static pm_web_ui_hooks_t s_hooks;
 
-extern const uint8_t index_html_start[] asm("_binary_www_index_html_start");
-extern const uint8_t index_html_end[] asm("_binary_www_index_html_end");
+extern const uint8_t index_html_start[] asm("_binary_index_html_start");
+extern const uint8_t index_html_end[] asm("_binary_index_html_end");
 
 static esp_err_t send_json(httpd_req_t *req, cJSON *obj)
 {

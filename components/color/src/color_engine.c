@@ -91,13 +91,13 @@ uint8_t pm_gamma8(uint8_t v, uint8_t gamma_x100)
     }
     /* Compact approximation of v^(gamma/100) in 8-bit space */
     float x = v / 255.0f;
-    float g = gamma_x100 / 100.0f;
-    float y = 1.0f;
+    float y;
     /* pow via exp/log would need libm; use iterative for common 2.2 */
     if (gamma_x100 >= 200 && gamma_x100 <= 240) {
         y = x * x * (0.8f + 0.2f * x); /* ≈ x^2.2 */
     } else {
         y = x * x;
+        (void)gamma_x100;
     }
     int out = (int)(y * 255.0f + 0.5f);
     if (out < 0) out = 0;
