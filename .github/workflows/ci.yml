@@ -15,7 +15,7 @@ jobs:
     name: Lint & structure
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify required project files
         run: |
@@ -74,7 +74,7 @@ jobs:
             bootloader_offset: "0x0"
             flash_freq: 80m
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build firmware
         uses: espressif/esp-idf-ci-action@v1
