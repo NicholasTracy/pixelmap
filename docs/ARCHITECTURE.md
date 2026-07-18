@@ -34,7 +34,7 @@ WS281x / SK6812 / TM1814 use the ESP32 **RMT** TX peripheral with nanosecond tim
 
 ## Status LED
 
-`status_led` drives the WLED-style onboard LED (default **GPIO 2**). Modes: boot, Wi‑Fi connecting, AP/setup, healthy heartbeat, DMX active, strip fault, SOS general fault. Automatically disabled if the pin conflicts with LED data/clock.
+`status_led` drives the WLED-style onboard LED (default **GPIO 2**) with **LEDC PWM** breathing/ramps so modes are visually distinct: boot fade-in, fast Wi‑Fi breath, slow AP breath, soft heartbeat, DMX sawtooth, fault peaks, soft SOS. Automatically disabled if the pin conflicts with LED data/clock.
 
 ## Persistence
 

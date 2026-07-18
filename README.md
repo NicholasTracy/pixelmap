@@ -204,17 +204,17 @@ You can change the data pin in the web UI if your board uses a different layout.
 
 ### Status LED meanings
 
-The onboard status LED (default **GPIO 2**) shows controller health at a glance:
+The onboard status LED (default **GPIO 2**) uses **PWM breathing / ramps** so modes are easy to tell apart (not just hard on/off blinks):
 
-| Pattern | Meaning |
-|---------|---------|
-| Solid on | Booting |
-| Fast blink (~4×/sec) | Connecting to Wi‑Fi |
-| Slow blink (1×/sec) | Setup mode / PixelMap Wi‑Fi hotspot is on |
-| Short heartbeat every ~2.5s | Running normally (local effects) |
-| Medium blink (2×/sec) | Receiving Art-Net or sACN |
-| Very fast blink | LED strip/output fault |
-| SOS (`··· ——— ···`) | Serious configuration / startup fault |
+| Animation | Meaning |
+|-----------|---------|
+| Soft fade-in, then steady glow | Booting |
+| Fast breath (~0.4s cycle) | Connecting to Wi‑Fi |
+| Slow calm breath (~2.2s cycle) | Setup mode / PixelMap Wi‑Fi hotspot is on |
+| Gentle double-heartbeat every ~2.8s | Running normally (local effects) |
+| Medium sawtooth ramp (~0.65s) | Receiving Art-Net or sACN |
+| Sharp urgent peaks | LED strip/output fault |
+| Soft-edged SOS (`··· ——— ···`) | Serious configuration / startup fault |
 
 If you assign GPIO 2 as LED data instead, the status LED is disabled automatically so it does not fight the pixel bus.
 
@@ -262,8 +262,8 @@ PixelMap does not lock the board. To return to WLED:
 | Flasher cannot find the board | Try another USB cable/port, install/update the USB serial driver, and repeat the BOOT + RESET sequence |
 | Flash succeeds but no Wi‑Fi network appears | Confirm you used the **merged** image, power-cycle the board, and wait ~10 seconds |
 | Lights do not respond | Check data pin (often GPIO 16), LED type, pixel count, and that ground is shared between power supply and controller |
-| Onboard LED blinks very fast | LED output fault — check chipset/pin settings, then reboot |
-| Onboard LED blinks once per second | Controller is in setup hotspot mode (`PixelMap-XXXX`) |
+| Onboard LED shows sharp urgent peaks | LED output fault — check chipset/pin settings, then reboot |
+| Onboard LED breathes slowly | Controller is in setup hotspot mode (`PixelMap-XXXX`) |
 | Patterns look wrong spatially | Rebuild or drag-edit the pixel map so it matches the physical layout |
 | Want WLED back | Reflash WLED with your normal installer |
 
