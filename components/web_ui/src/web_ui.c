@@ -75,6 +75,13 @@ static esp_err_t h_get_config(httpd_req_t *req)
     cJSON_AddBoolToObject(o, "sen", c->sacn_enable);
     cJSON_AddNumberToObject(o, "mw", c->map_width);
     cJSON_AddNumberToObject(o, "mh", c->map_height);
+    cJSON_AddBoolToObject(o, "pove", c->pov_enable);
+    cJSON_AddNumberToObject(o, "povm", c->pov_mode);
+    cJSON_AddNumberToObject(o, "poyl", c->pov_layout);
+    cJSON_AddNumberToObject(o, "povrpm", c->pov_rpm);
+    cJSON_AddNumberToObject(o, "povspd", c->pov_linear_speed_mps);
+    cJSON_AddNumberToObject(o, "povrad", c->pov_radius_m);
+    cJSON_AddNumberToObject(o, "povpath", c->pov_path_length_m);
     return send_json(req, o);
 }
 
@@ -108,6 +115,13 @@ static esp_err_t h_post_config(httpd_req_t *req)
     if ((v = cJSON_GetObjectItem(j, "sen"))) c->sacn_enable = cJSON_IsTrue(v);
     if ((v = cJSON_GetObjectItem(j, "mw")) && cJSON_IsNumber(v)) c->map_width = (uint16_t)v->valuedouble;
     if ((v = cJSON_GetObjectItem(j, "mh")) && cJSON_IsNumber(v)) c->map_height = (uint16_t)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(j, "pove"))) c->pov_enable = cJSON_IsTrue(v);
+    if ((v = cJSON_GetObjectItem(j, "povm")) && cJSON_IsNumber(v)) c->pov_mode = (pm_pov_mode_t)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(j, "poyl")) && cJSON_IsNumber(v)) c->pov_layout = (pm_pov_layout_t)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(j, "povrpm")) && cJSON_IsNumber(v)) c->pov_rpm = (float)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(j, "povspd")) && cJSON_IsNumber(v)) c->pov_linear_speed_mps = (float)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(j, "povrad")) && cJSON_IsNumber(v)) c->pov_radius_m = (float)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(j, "povpath")) && cJSON_IsNumber(v)) c->pov_path_length_m = (float)v->valuedouble;
     cJSON_Delete(j);
 
     pm_config_save(c);

@@ -77,9 +77,38 @@ button.primary{background:linear-gradient(180deg,#2d6b52,#1f4a39);border-color:v
           <option value="3">Noise Field</option>
           <option value="4">Radial Wave</option>
           <option value="5">Plane Sweep</option>
+          <option value="6">POV Image Plane</option>
         </select>
       </div>
       <div><label>Effect Speed</label><input id="speed" type="number" step="0.1" min="0" max="10"/></div>
+    </div>
+    <h2 style="margin-top:1.1rem">Persistence of Vision (POV)</h2>
+    <p class="status">For a spinning fan blade or a waved wand. Set RPM / speed to match the real motion so patterns paint correctly in mid-air.</p>
+    <div class="row">
+      <label><input id="pove" type="checkbox"/> Enable POV mapping</label>
+      <div><label>Motion mode</label>
+        <select id="povm">
+          <option value="1">Rotation (fan / propeller)</option>
+          <option value="2">Linear (wand sweep)</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div><label>Strip layout</label>
+        <select id="poyl">
+          <option value="0">Radius (hub → tip)</option>
+          <option value="1">Diameter (tip → tip)</option>
+        </select>
+      </div>
+      <div><label>RPM (rotation)</label><input id="povrpm" type="number" step="1" min="0" max="10000"/></div>
+    </div>
+    <div class="row">
+      <div><label>Linear speed (m/s)</label><input id="povspd" type="number" step="0.1" min="0" max="50"/></div>
+      <div><label>Radius / half-span (m)</label><input id="povrad" type="number" step="0.01" min="0.01" max="5"/></div>
+    </div>
+    <div class="row">
+      <div><label>Wand path length (m)</label><input id="povpath" type="number" step="0.05" min="0.1" max="10"/></div>
+      <div></div>
     </div>
     <div class="row">
       <div><label>Art-Net Universe</label><input id="aun" type="number"/></div>
@@ -118,6 +147,8 @@ async function loadCfg(){
   chip.value=c.chip||'WS2812B'; fx.value=c.fx; speed.value=c.speed??1;
   aun.value=c.aun; sun.value=c.sun; aen.checked=!!c.aen; sen.checked=!!c.sen;
   mw.value=c.mw||10; mh.value=c.mh||6;
+  pove.checked=!!c.pove; povm.value=String(c.povm??1); poyl.value=String(c.poyl??1);
+  povrpm.value=c.povrpm??600; povspd.value=c.povspd??4; povrad.value=c.povrad??0.25; povpath.value=c.povpath??1;
 }
 async function loadMap(){
   const r = await fetch('/api/map');
@@ -172,7 +203,9 @@ saveCfg.onclick=async()=>{
     count:+count.value, bri:+bri.value, gamma:+gamma.value,
     chip:chip.value, fx:+fx.value, speed:+speed.value,
     aun:+aun.value, sun:+sun.value, aen:aen.checked, sen:sen.checked,
-    mw:+mw.value, mh:+mh.value
+    mw:+mw.value, mh:+mh.value,
+    pove:pove.checked, povm:+povm.value, poyl:+poyl.value,
+    povrpm:+povrpm.value, povspd:+povspd.value, povrad:+povrad.value, povpath:+povpath.value
   };
   const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   cfgStatus.textContent = r.ok ? 'Saved. Reboot if WiFi/GPIO changed.' : 'Save failed';

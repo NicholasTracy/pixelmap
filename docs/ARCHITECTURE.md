@@ -28,6 +28,10 @@ map / Art-Net / sACN / UI
 
 Effects do **not** walk strip index as a 1D rainbow by default. They sample `pm_mapped_pixel_t.pos` (`x,y,z`) so the same shader works on lines, grids, rings, and irregular fixtures.
 
+## Persistence of vision (POV)
+
+When POV is enabled, `effects` asks `pov` for each pixel’s **instantaneous world position** from time + RPM (rotation) or linear speed (wand). Spatial shaders then sample that plane. `PM_EFFECT_POV_IMAGE_PLANE` keeps the pattern fixed in world space so motion alone “paints” the image.
+
 ## Bare-metal signaling
 
 WS281x / SK6812 / TM1814 use the ESP32 **RMT** TX peripheral with nanosecond timing tables (`led_chipsets.c`). Bit patterns are DMA-friendly via `rmt_bytes_encoder`. APA102 / SK9822 are modeled as clocked buses (SPI host binding is the intended production path).

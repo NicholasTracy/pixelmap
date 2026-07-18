@@ -8,6 +8,7 @@
 #include "led_strip.h"
 #include "pixel_map.h"
 #include "effects.h"
+#include "pov.h"
 #include "wifi_mgr.h"
 #include "web_ui.h"
 #include "artnet.h"
@@ -92,10 +93,19 @@ static void update_status_led(bool dmx_active)
     pm_status_led_set_mode(PM_STATUS_WIFI_AP);
 }
 
+static void apply_pov_map_if_needed(void)
+{
+    if (!s_map || !s_cfg.pov_enable) return;
+    uint16_t n = s_cfg.pixel_count > 0 ? s_cfg.pixel_count : pm_pixel_map_count(s_map);
+    if (n == 0) return;
+    pm_pov_build_strip_map(s_map, n, s_cfg.pov_layout);
+}
+
 static void on_config_changed(void)
 {
     s_rebuild = true;
     apply_correction();
+    apply_pov_map_if_needed();
 }
 
 static void on_map_changed(void)
@@ -160,6 +170,16 @@ static void render_loop(void *arg)
                     .palette_blend = 0,
                 },
                 .time_ms = (uint32_t)(esp_timer_get_time() / 1000ULL),
+                .pov_enabled = s_cfg.pov_enable,
+                .pov = {
+                    .mode = s_cfg.pov_enable ? s_cfg.pov_mode : PM_POV_OFF,
+                    .layout = s_cfg.pov_layout,
+                    .rpm = s_cfg.pov_rpm,
+                    .linear_speed_mps = s_cfg.pov_linear_speed_mps,
+                    .radius_m = s_cfg.pov_radius_m,
+                    .path_length_m = s_cfg.pov_path_length_m,
+                },
+                .strip_len = pm_led_strip_length(s_strip),
             };
             pm_effect_render(&ctx, set_px, NULL);
         }
@@ -203,8 +223,12 @@ void app_main(void)
         mc.capacity = (uint16_t)(s_cfg.map_width * s_cfg.map_height);
     }
     ESP_ERROR_CHECK(pm_pixel_map_create(&mc, &s_map));
-    ESP_ERROR_CHECK(pm_pixel_map_build_grid(s_map, s_cfg.map_width, s_cfg.map_height, 1.0f, 0));
-    pm_pixel_map_normalize(s_map);
+    if (s_cfg.pov_enable) {
+        apply_pov_map_if_needed();
+    } else {
+        ESP_ERROR_CHECK(pm_pixel_map_build_grid(s_map, s_cfg.map_width, s_cfg.map_height, 1.0f, 0));
+        pm_pixel_map_normalize(s_map);
+    }
 
     if (rebuild_strip() != ESP_OK) {
         pm_status_led_set_mode(PM_STATUS_FAULT_STRIP);

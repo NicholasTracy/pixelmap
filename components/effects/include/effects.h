@@ -2,7 +2,9 @@
 
 #include "color_types.h"
 #include "pixel_map.h"
+#include "pov.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,12 +17,13 @@ typedef enum {
     PM_EFFECT_NOISE_FIELD,
     PM_EFFECT_RADIAL_WAVE,
     PM_EFFECT_PLANE_SWEEP,
+    PM_EFFECT_POV_IMAGE_PLANE, /* spatial pattern stable in the swept POV plane */
     PM_EFFECT_COUNT
 } pm_effect_id_t;
 
 typedef struct {
     pm_effect_id_t id;
-    float speed;          /* 0..10 */
+    float speed;          /* 0..10 effect animation rate (independent of POV RPM) */
     float scale;          /* spatial frequency */
     float intensity;      /* 0..1 */
     pm_hsv_t primary;
@@ -32,6 +35,9 @@ typedef struct {
     const pm_pixel_map_t *map;
     pm_effect_params_t params;
     uint32_t time_ms;
+    bool pov_enabled;
+    pm_pov_params_t pov;
+    uint16_t strip_len;   /* physical strip length for POV */
 } pm_effect_context_t;
 
 const char *pm_effect_name(pm_effect_id_t id);

@@ -2,6 +2,10 @@
 #include "color_engine.h"
 #include <math.h>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 static float hash2(float x, float y)
 {
     float n = sinf(x * 127.1f + y * 311.7f) * 43758.5453f;
@@ -30,8 +34,29 @@ const char *pm_effect_name(pm_effect_id_t id)
     case PM_EFFECT_NOISE_FIELD: return "Noise Field";
     case PM_EFFECT_RADIAL_WAVE: return "Radial Wave";
     case PM_EFFECT_PLANE_SWEEP: return "Plane Sweep";
+    case PM_EFFECT_POV_IMAGE_PLANE: return "POV Image Plane";
     default: return "Unknown";
     }
+}
+
+static pm_vec3_t sample_pos(const pm_effect_context_t *ctx, uint16_t map_index,
+                            const pm_mapped_pixel_t *px)
+{
+    if (ctx->pov_enabled && ctx->pov.mode != PM_POV_OFF && ctx->strip_len > 0) {
+        pm_vec3_t w = pm_pov_world_pos(&ctx->pov, px->index, ctx->strip_len, ctx->time_ms);
+        /* Normalize into roughly -1..1 / 0..1 space using radius */
+        float inv = ctx->pov.radius_m > 1e-4f ? (1.0f / ctx->pov.radius_m) : 1.0f;
+        if (ctx->pov.mode == PM_POV_LINEAR) {
+            float path = ctx->pov.path_length_m > 1e-4f ? ctx->pov.path_length_m : 1.0f;
+            w.x = w.x / path;          /* -0.5..0.5 */
+            w.y = w.y * inv;           /* -1..1 or 0..1 by layout */
+        } else {
+            w.x *= inv;
+            w.y *= inv;
+        }
+        return w;
+    }
+    return px->pos;
 }
 
 pm_rgb_t pm_effect_eval(const pm_effect_context_t *ctx, uint16_t map_index)
@@ -41,10 +66,11 @@ pm_rgb_t pm_effect_eval(const pm_effect_context_t *ctx, uint16_t map_index)
         return (pm_rgb_t){0, 0, 0};
     }
 
+    pm_vec3_t pos = sample_pos(ctx, map_index, px);
     float t = ctx->time_ms * 0.001f * ctx->params.speed;
-    float x = px->pos.x * ctx->params.scale;
-    float y = px->pos.y * ctx->params.scale;
-    float z = px->pos.z * ctx->params.scale;
+    float x = pos.x * ctx->params.scale;
+    float y = pos.y * ctx->params.scale;
+    float z = pos.z * ctx->params.scale;
     float inten = ctx->params.intensity;
     if (inten < 0) inten = 0;
     if (inten > 1) inten = 1;
@@ -76,15 +102,13 @@ pm_rgb_t pm_effect_eval(const pm_effect_context_t *ctx, uint16_t map_index)
     case PM_EFFECT_NOISE_FIELD: {
         float n = noise2(x + t * 0.2f, y - t * 0.15f);
         float n2 = noise2(x * 2.0f - t, z * 2.0f + t * 0.3f);
-        hsv.h = (uint8_t)((n * 200.0f + ctx->params.primary.h) );
+        hsv.h = (uint8_t)(n * 200.0f + ctx->params.primary.h);
         hsv.s = (uint8_t)(180 + n2 * 75.0f);
         hsv.v = (uint8_t)(n * 255.0f * inten);
         break;
     }
     case PM_EFFECT_RADIAL_WAVE: {
-        float cx = x - 0.5f * ctx->params.scale;
-        float cy = y - 0.5f * ctx->params.scale;
-        float d = sqrtf(cx * cx + cy * cy + z * z);
+        float d = sqrtf(x * x + y * y + z * z);
         float w = 0.5f + 0.5f * sinf(d * 8.0f - t * 4.0f);
         hsv = ctx->params.primary;
         pm_hsv_t b = ctx->params.secondary;
@@ -99,6 +123,24 @@ pm_rgb_t pm_effect_eval(const pm_effect_context_t *ctx, uint16_t map_index)
         float band = f < 0.15f ? (1.0f - f / 0.15f) : 0.0f;
         hsv = ctx->params.primary;
         hsv.v = (uint8_t)(band * 255.0f * inten);
+        break;
+    }
+    case PM_EFFECT_POV_IMAGE_PLANE: {
+        /*
+         * Pattern fixed in the swept world plane (persistence of vision).
+         * Motion comes from POV RPM/speed — do not scroll with effect time.
+         */
+        float r = sqrtf(x * x + y * y);
+        float ang = atan2f(y, x); /* -π..π */
+        float spokes = 6.0f;
+        float a = ang / (float)(2.0 * M_PI);
+        if (a < 0.0f) a += 1.0f;
+        float spoke = fabsf(sinf(a * (float)M_PI * spokes));
+        float ring = 0.5f + 0.5f * sinf(r * 14.0f);
+        float mix = spoke * 0.65f + ring * 0.35f;
+        hsv.h = (uint8_t)((a * 255.0f) + r * 30.0f);
+        hsv.s = 230;
+        hsv.v = (uint8_t)(mix * 255.0f * inten);
         break;
     }
     default:

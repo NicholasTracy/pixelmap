@@ -2,6 +2,7 @@
 
 #include "led_chipsets.h"
 #include "effects.h"
+#include "pov.h"
 #include "esp_err.h"
 #include <stdint.h>
 #include <stdbool.h>
@@ -43,6 +44,15 @@ typedef struct {
 
     uint16_t map_width;
     uint16_t map_height;
+
+    /* Persistence-of-vision mapping (fan / wand) */
+    bool pov_enable;
+    pm_pov_mode_t pov_mode;
+    pm_pov_layout_t pov_layout;
+    float pov_rpm;              /* fixed rotation speed for now */
+    float pov_linear_speed_mps; /* wand sweep speed */
+    float pov_radius_m;
+    float pov_path_length_m;
 } pm_app_config_t;
 
 void pm_config_set_defaults(pm_app_config_t *cfg);

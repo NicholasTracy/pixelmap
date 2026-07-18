@@ -27,6 +27,7 @@ If you already flash WLED onto a board, flashing PixelMap feels familiar.
 
 - Map pixels in 1D, 2D, or 3D and edit the layout in the browser
 - Run patterns based on spatial position (not just “pixel number along the strip”)
+- **Persistence of vision (POV)** for spinning fans or waved wands — set fixed RPM / speed so the math paints a stable plane in mid-air
 - Use common LED types such as WS2812B, WS2811, SK6812 (RGBW), and more
 - Mix RGB, RGBW, and dual-white style chips with color correction similar to FastLED
 - Control from a phone/computer UI, or from Art-Net / sACN lighting software
@@ -165,6 +166,37 @@ When the controller joins your normal Wi‑Fi, use the IP address shown on that 
 6. Save settings, then refresh / reconnect if you changed Wi‑Fi
 
 ---
+
+## Persistence of vision (POV)
+
+Use this when a strip is **moving fast enough** that your eye blends the light into a 2D image — for example:
+
+- A LED strip across a **rotating fan / propeller**
+- A LED **wand** waved side to side in a plane
+
+### How it works
+
+PixelMap computes each pixel’s position in the swept plane from time and your motion settings:
+
+- **Rotation:** `angle = 2π × (RPM / 60) × time`, then `x,y` from strip layout × radius  
+- **Linear wand:** strip height along the blade, position along the path from linear speed (triangular back-and-forth)
+
+Patterns (especially **POV Image Plane**) are sampled in that world plane, so with the correct RPM/speed the image appears stable in space.
+
+### Suggested starting values
+
+| Setting | Typical start |
+|---------|----------------|
+| Mode | Rotation (fan) or Linear (wand) |
+| Layout | Diameter (strip across hub) or Radius (hub → tip) |
+| RPM | Match your fan/wand spin (e.g. 600) |
+| Radius / half-span | Physical tip distance in meters (e.g. 0.25) |
+| Linear speed | Wand sweep speed in m/s (e.g. 4) |
+| Effect | POV Image Plane (or any spatial effect with POV enabled) |
+
+Enable **POV mapping** in the web UI, set RPM/speed to match the real mechanism, save, and spin/wave the strip.
+
+> RPM and linear speed are **fixed configuration values for now** (not auto-measured). Matching them to the real motion is what keeps the math correct.
 
 ## Using PixelMap day to day
 
