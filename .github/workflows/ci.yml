@@ -102,7 +102,7 @@ jobs:
             && cp build/partition_table/partition-table.bin build/partition-table-${{ matrix.target }}.bin
 
       - name: Upload firmware artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pixelmap-${{ matrix.target }}-${{ matrix.idf_version }}
           path: |
