@@ -142,9 +142,10 @@ body{
         <h2 class="pm-section-title">Wi‑Fi &amp; device</h2>
         <div class="row g-3">
           <div class="col-md-6"><label class="form-label" for="ssid">WiFi SSID</label><input class="form-control" id="ssid"/></div>
-          <div class="col-md-6"><label class="form-label" for="pass">WiFi Password</label><input class="form-control" id="pass" type="password"/></div>
+          <div class="col-md-6"><label class="form-label" for="pass">WiFi Password</label><input class="form-control" id="pass" type="password" placeholder="Leave blank to keep current" autocomplete="new-password"/></div>
           <div class="col-md-6"><label class="form-label" for="host">Hostname</label><input class="form-control" id="host"/></div>
         </div>
+        <p class="pm-help mt-2 mb-0" id="passHint" hidden>A Wi‑Fi password is stored on the device (not shown).</p>
         <button class="btn btn-pm-primary mt-3" type="button" id="saveNetwork">Save network settings</button>
         <div class="pm-status" id="statusNetwork"></div>
       </div>
@@ -162,9 +163,23 @@ body{
             <select class="form-select" id="chip">
               <option>WS2812B</option><option>WS2812</option><option>WS2811</option>
               <option>WS2813</option><option>SK6812_RGBW</option><option>TM1814</option>
-              <option>APA102</option><option>SK9822</option>
+            </select>
+            <p class="pm-help mb-0 mt-1">APA102/SK9822 SPI support is planned; those chipsets are hidden until ready.</p>
+          </div>
+          <div class="col-md-6"><label class="form-label" for="order">Color order</label>
+            <select class="form-select" id="order">
+              <option>GRB</option><option>RGB</option><option>BGR</option>
+              <option>RBG</option><option>GBR</option><option>BRG</option>
+              <option>GRBW</option><option>RGBW</option><option>WRGB</option>
             </select>
           </div>
+          <div class="col-md-6"><label class="form-label" for="clk">Clock GPIO (−1 unused)</label>
+            <input class="form-control" id="clk" type="number" value="-1"/>
+            <p class="pm-help mb-0 mt-1">Reserved for future clocked chipsets (APA102).</p>
+          </div>
+          <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="aw"/><label class="form-check-label" for="aw">Auto white (RGBW)</label>
+          </div></div>
           <div class="col-12" id="stripBusGate">
             <label class="form-label">Strip outputs</label>
             <div class="d-flex flex-column gap-2" id="stripBusFields"></div>
@@ -325,11 +340,15 @@ return hsv((ph + t * 40 + d * 80 * p2) % 256, ps, wave * pv * intensity)</textar
           <div class="col-md-6">
             <div class="form-check"><input class="form-check-input" type="checkbox" id="sen"/><label class="form-check-label" for="sen">sACN</label></div>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label class="form-label" for="universe">Universe</label>
             <input class="form-control" id="universe" type="number" min="0" max="63999"/>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
+            <label class="form-label" for="ucnt">Universe count</label>
+            <input class="form-control" id="ucnt" type="number" min="1" max="16" value="4"/>
+          </div>
+          <div class="col-md-4">
             <label class="form-label" for="dmxmode">Stream mode</label>
             <select class="form-select" id="dmxmode">
               <option value="1">Effect parameters (ch 1–23)</option>
@@ -337,7 +356,7 @@ return hsv((ph + t * 40 + d * 80 * p2) % 256, ps, wave * pv * intensity)</textar
             </select>
           </div>
         </div>
-        <p class="pm-help mt-2 mb-0">Only one protocol can be on. Universe applies to the enabled protocol.</p>
+        <p class="pm-help mt-2 mb-0">Only one protocol can be on. Enabling Art-Net/sACN applies immediately (no reboot).</p>
       </div>
       <div class="pm-panel mt-3">
         <h2 class="pm-section-title">Channel control</h2>
@@ -1272,13 +1291,13 @@ function collectConfig(){
   count.value = String(total);
   gpio.value = String(sgpios[0] ?? 16);
   const fxc = collectFxConfig();
-  return {
-    ssid:ssid.value, pass:pass.value, host:host.value,
-    gpio:+gpio.value, sled:+sled.value, sledh:sledh.checked,
+  const body = {
+    ssid:ssid.value, host:host.value,
+    gpio:+gpio.value, clk:+clk.value, sled:+sled.value, sledh:sledh.checked,
     count:total, scnt:stripCount(), slens, sgpios,
-    bri:+bri.value, gamma:+gamma.value,
-    chip:chip.value, fx:+fx.value, ...fxc,
-    aun:+universe.value | 0, sun:+universe.value | 0,
+    bri:+bri.value, gamma:+gamma.value, aw:!!aw.checked,
+    chip:chip.value, order:order.value, fx:+fx.value, ...fxc,
+    aun:+universe.value | 0, sun:+universe.value | 0, ucnt:+ucnt.value | 0,
     aen:!!aen.checked, sen:!!sen.checked && !aen.checked,
     mw:+mw.value, mh:+mh.value, md:+md.value, mdim:+mdim.value,
     mlay:+mlay.value, mfill:+mfill.value,
@@ -1287,12 +1306,15 @@ function collectConfig(){
     pove:pove.checked, povm:+povm.value, poyl:+poyl.value, povbl:+povbl.value,
     povrpm:+povrpm.value, povspd:+povspd.value, povrad:+povrad.value, povpath:+povpath.value
   };
+  if (pass.value) body.pass = pass.value;
+  return body;
 }
 
 async function saveConfig(statusEl, note){
   const body = collectConfig();
   const r = await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   setStatus(statusEl, r.ok, r.ok ? (note || 'Saved.') : 'Save failed');
+  if (r.ok && pass.value) pass.value = '';
   updateGates();
 }
 
@@ -1860,14 +1882,23 @@ function stopPovAnim(){
 async function loadCfg(){
   const r = await fetch('/api/config');
   const c = await r.json();
-  ssid.value=c.ssid||''; pass.value=c.pass||''; host.value=c.host||'pixelmap';
+  ssid.value=c.ssid||''; pass.value=''; host.value=c.host||'pixelmap';
+  const passHint = document.getElementById('passHint');
+  if (passHint) passHint.hidden = !c.passSet;
   bri.value=c.bri; briVal.textContent='('+c.bri+')';
   gamma.value=c.gamma; sled.value=c.sled??2; sledh.checked=c.sledh!==false;
-  chip.value=c.chip||'WS2812B'; fx.value=String(c.fx??1);
+  clk.value = c.clk != null ? c.clk : -1;
+  aw.checked = c.aw !== false;
+  let chipName = c.chip || 'WS2812B';
+  if (chipName === 'APA102' || chipName === 'SK9822' || chipName === 'CUSTOM') chipName = 'WS2812B';
+  chip.value = chipName;
+  order.value = c.order || 'GRB';
+  fx.value=String(c.fx??1);
   applyFxConfig(c);
   aen.checked=!!c.aen; sen.checked=!!c.sen && !c.aen;
   if (aen.checked && sen.checked) sen.checked = false;
   universe.value = (c.aun != null ? c.aun : c.sun) ?? 0;
+  ucnt.value = c.ucnt != null ? c.ucnt : 4;
   syncCtlModVisibility();
   mw.value=c.mw||10; mh.value=c.mh||6; md.value=c.md||1; mdim.value=String(c.mdim??0);
   mlay.value=String(c.mlay??0); mfill.value=String(c.mfill??0); mopentb.checked=!!c.mopentb; mspc.value=fmt1(c.mspc??1);
@@ -4166,9 +4197,9 @@ fetch('/api/fx/lua').then(r => r.ok ? r.json() : null).then(j => {
   }
 }).catch(() => {});
 
-saveNetwork.onclick=()=>saveConfig(statusNetwork,'Saved. Reboot if Wi‑Fi changed.');
+saveNetwork.onclick=()=>saveConfig(statusNetwork,'Saved. Wi‑Fi credentials apply immediately.');
 saveStrip.onclick=async()=>{
-  await saveConfig(statusStrip,'Saved. Reboot if GPIO/chipset changed.');
+  await saveConfig(statusStrip,'Strip settings saved.');
   syncStripTotal();
   syncMapBudget();
 };

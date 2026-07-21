@@ -26,6 +26,9 @@ pm_rgbww_t pm_rgb_to_rgbww(pm_rgb_t in, bool auto_white, uint8_t warm_mix);
 void pm_pack_pixel(const uint8_t *channels, int channel_count,
                    pm_color_order_t order, uint8_t *out, int *out_len);
 
+const char *pm_color_order_name(pm_color_order_t order);
+pm_color_order_t pm_color_order_from_name(const char *name);
+
 uint8_t pm_gamma8(uint8_t v, uint8_t gamma_x100);
 
 #ifdef __cplusplus

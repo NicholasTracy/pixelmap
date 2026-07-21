@@ -315,11 +315,22 @@ void pm_config_sync_strips(pm_app_config_t *cfg)
     cfg->gpio_data = cfg->strip_gpio[0];
 }
 
+static void coerce_unsupported_chipset(pm_app_config_t *cfg)
+{
+    /* APA102/SK9822 SPI path is not implemented yet — fall back safely. */
+    if (cfg->chipset == PM_CHIPSET_APA102 || cfg->chipset == PM_CHIPSET_SK9822 ||
+        cfg->chipset == PM_CHIPSET_CUSTOM) {
+        cfg->chipset = PM_CHIPSET_WS2812B;
+    }
+}
+
 esp_err_t pm_config_load(pm_app_config_t *cfg)
 {
     pm_config_set_defaults(cfg);
     nvs_handle_t h;
     esp_err_t err = nvs_open(NS, NVS_READONLY, &h);
+    /* First boot / erased NVS: keep defaults and succeed. */
+    if (err == ESP_ERR_NVS_NOT_FOUND) return ESP_OK;
     if (err != ESP_OK) return err;
 
     size_t len = sizeof(cfg->sta_ssid);
@@ -439,6 +450,8 @@ esp_err_t pm_config_load(pm_app_config_t *cfg)
     if (nvs_get_i32(h, "povpath", &v) == ESP_OK) cfg->pov_path_length_m = (float)v / 1000.0f;
 
     nvs_close(h);
+    coerce_unsupported_chipset(cfg);
+    pm_config_sync_strips(cfg);
     return ESP_OK;
 }
 

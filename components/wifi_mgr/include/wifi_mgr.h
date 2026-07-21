@@ -15,6 +15,8 @@ typedef struct {
 } pm_wifi_config_t;
 
 esp_err_t pm_wifi_start(const pm_wifi_config_t *cfg);
+/** Apply new STA credentials / hostname without full stack re-init. */
+esp_err_t pm_wifi_apply(const pm_wifi_config_t *cfg);
 bool pm_wifi_sta_connected(void);
 bool pm_wifi_ap_active(void);
 bool pm_wifi_sta_connecting(void);

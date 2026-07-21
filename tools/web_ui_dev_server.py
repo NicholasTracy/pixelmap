@@ -18,10 +18,12 @@ HOST = "127.0.0.1"
 PORT = 8080
 
 CONFIG = {
+    "ver": "0.1.0",
     "ssid": "StudioWiFi",
-    "pass": "",
+    "pass": "dev-secret",
     "host": "pixelmap-dev",
     "gpio": 16,
+    "clk": -1,
     "sled": 2,
     "sledh": True,
     "count": 60,
@@ -30,7 +32,9 @@ CONFIG = {
     "sgpios": [16],
     "bri": 128,
     "gamma": 220,
+    "aw": True,
     "chip": "WS2812B",
+    "order": "GRB",
     "fx": 6,
     "speed": 1.0,
     "scale": 1.0,
@@ -49,8 +53,10 @@ CONFIG = {
         {"shape": 0, "depth": 128, "rate": 40, "phase": 0} for _ in range(23)
     ],
     "dmxmode": 1,
+    "fxmask": 0x7FFFFF,
     "aun": 0,
     "sun": 0,
+    "ucnt": 4,
     "aen": False,
     "sen": False,
     "mw": 10,
@@ -579,7 +585,12 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, INDEX.read_bytes(), "text/html; charset=utf-8")
             return
         if path == "/api/config":
-            self._json(200, CONFIG)
+            pub = dict(CONFIG)
+            pub["passSet"] = bool(pub.get("pass"))
+            pub.pop("pass", None)
+            if "fxmask" not in pub:
+                pub["fxmask"] = 0x7FFFFF
+            self._json(200, pub)
             return
         if path == "/api/map":
             self._json(200, MAP)
@@ -615,13 +626,19 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/config":
+            # Empty / omitted pass keeps the previous password (device parity).
+            new_pass = payload.pop("pass", None) if isinstance(payload, dict) else None
             CONFIG.update(payload)
+            if isinstance(new_pass, str) and new_pass:
+                CONFIG["pass"] = new_pass
             # One protocol at a time; keep Art-Net / sACN universe in sync
             if CONFIG.get("aen") and CONFIG.get("sen"):
                 CONFIG["sen"] = False
             uni = CONFIG.get("aun", CONFIG.get("sun", 0))
             CONFIG["aun"] = uni
             CONFIG["sun"] = uni
+            if CONFIG.get("chip") in ("APA102", "SK9822", "CUSTOM"):
+                CONFIG["chip"] = "WS2812B"
             default_gpios = [16, 2, 4, 13, 14, 15, 18, 19]
             slens = CONFIG.get("slens")
             sgpios = CONFIG.get("sgpios")

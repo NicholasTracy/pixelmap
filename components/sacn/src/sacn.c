@@ -102,14 +102,17 @@ esp_err_t pm_sacn_start(const pm_sacn_config_t *cfg)
 
 void pm_sacn_stop(void)
 {
-    if (s_task) {
-        vTaskDelete(s_task);
-        s_task = NULL;
-    }
     if (s_sock >= 0) {
+        shutdown(s_sock, SHUT_RDWR);
         close(s_sock);
         s_sock = -1;
     }
+    if (s_task) {
+        vTaskDelay(pdMS_TO_TICKS(20));
+        vTaskDelete(s_task);
+        s_task = NULL;
+    }
+    s_last_us = 0;
 }
 
 bool pm_sacn_active(uint32_t timeout_ms)

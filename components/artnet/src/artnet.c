@@ -98,14 +98,18 @@ esp_err_t pm_artnet_start(const pm_artnet_config_t *cfg)
 
 void pm_artnet_stop(void)
 {
-    if (s_task) {
-        vTaskDelete(s_task);
-        s_task = NULL;
-    }
+    /* Close socket first so a blocked recvfrom unblocks before task delete. */
     if (s_sock >= 0) {
+        shutdown(s_sock, SHUT_RDWR);
         close(s_sock);
         s_sock = -1;
     }
+    if (s_task) {
+        vTaskDelay(pdMS_TO_TICKS(20));
+        vTaskDelete(s_task);
+        s_task = NULL;
+    }
+    s_last_us = 0;
 }
 
 uint32_t pm_artnet_last_packet_ms(void)

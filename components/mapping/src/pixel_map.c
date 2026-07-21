@@ -1,6 +1,7 @@
 #include "pixel_map.h"
 #include "cJSON.h"
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -41,6 +42,82 @@ void pm_pixel_map_destroy(pm_pixel_map_t *map)
     if (!map) return;
     free(map->pixels);
     free(map);
+}
+
+uint16_t pm_pixel_map_capacity(const pm_pixel_map_t *map)
+{
+    return map ? map->capacity : 0;
+}
+
+esp_err_t pm_pixel_map_ensure_capacity(pm_pixel_map_t *map, uint16_t capacity)
+{
+    if (!map || capacity == 0) return ESP_ERR_INVALID_ARG;
+    if (capacity <= map->capacity) return ESP_OK;
+    pm_mapped_pixel_t *p = realloc(map->pixels, (size_t)capacity * sizeof(*p));
+    if (!p) return ESP_ERR_NO_MEM;
+    memset(p + map->capacity, 0, (size_t)(capacity - map->capacity) * sizeof(*p));
+    map->pixels = p;
+    map->capacity = capacity;
+    return ESP_OK;
+}
+
+esp_err_t pm_pixel_map_save_path(const pm_pixel_map_t *map, const char *path)
+{
+    if (!map || !path) return ESP_ERR_INVALID_ARG;
+    size_t need = (size_t)pm_pixel_map_count(map) * 64u + 32u;
+    if (need < 64) need = 64;
+    char *buf = malloc(need);
+    if (!buf) return ESP_ERR_NO_MEM;
+    size_t out = 0;
+    esp_err_t err = pm_pixel_map_export_json(map, buf, need, &out);
+    if (err != ESP_OK) {
+        free(buf);
+        return err;
+    }
+    FILE *f = fopen(path, "wb");
+    if (!f) {
+        free(buf);
+        return ESP_FAIL;
+    }
+    size_t n = fwrite(buf, 1, out, f);
+    fclose(f);
+    free(buf);
+    return (n == out) ? ESP_OK : ESP_FAIL;
+}
+
+esp_err_t pm_pixel_map_load_path(pm_pixel_map_t *map, const char *path)
+{
+    if (!map || !path) return ESP_ERR_INVALID_ARG;
+    FILE *f = fopen(path, "rb");
+    if (!f) return ESP_ERR_NOT_FOUND;
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        return ESP_FAIL;
+    }
+    long sz = ftell(f);
+    if (sz <= 0 || sz > 512 * 1024) {
+        fclose(f);
+        return ESP_ERR_INVALID_SIZE;
+    }
+    if (fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        return ESP_FAIL;
+    }
+    char *buf = malloc((size_t)sz + 1);
+    if (!buf) {
+        fclose(f);
+        return ESP_ERR_NO_MEM;
+    }
+    size_t n = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    if (n != (size_t)sz) {
+        free(buf);
+        return ESP_FAIL;
+    }
+    buf[sz] = '\0';
+    esp_err_t err = pm_pixel_map_import_json(map, buf);
+    free(buf);
+    return err;
 }
 
 esp_err_t pm_pixel_map_set(pm_pixel_map_t *map, uint16_t slot, const pm_mapped_pixel_t *px)

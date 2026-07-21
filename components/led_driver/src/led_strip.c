@@ -166,7 +166,11 @@ esp_err_t pm_led_strip_create(const pm_led_strip_config_t *cfg, pm_led_strip_t *
     ESP_RETURN_ON_FALSE(s->tx_buf, ESP_ERR_NO_MEM, TAG, "tx");
 
     if (s->timing->protocol == PM_BUS_PROTOCOL_SPI_CLOCKED) {
-        ESP_LOGW(TAG, "APA102/SK9822 path uses RMT bit-bang clocked mode placeholder; prefer SPI host binding in board config");
+        ESP_LOGE(TAG, "APA102/SK9822 SPI path not implemented; choose a WS281x/SK6812/TM1814 chipset");
+        free(s->tx_buf);
+        free(s->pixels);
+        free(s);
+        return ESP_ERR_NOT_SUPPORTED;
     }
 
     uint32_t res_hz = (cfg->rmt_resolution_hz_mhz ? cfg->rmt_resolution_hz_mhz : 10) * 1000000U;
@@ -276,34 +280,44 @@ void pm_led_strip_fill_rgb(pm_led_strip_t *strip, pm_rgb_t c)
     }
 }
 
-esp_err_t pm_led_strip_show(pm_led_strip_t *strip)
+size_t pm_led_encode_frame(const uint8_t *pixels, uint16_t count, uint8_t channels,
+                           pm_color_order_t order, const pm_color_correction_t *cc,
+                           uint8_t *out, size_t out_cap)
 {
-    ESP_RETURN_ON_FALSE(strip, ESP_ERR_INVALID_ARG, TAG, "null");
-
+    if (!pixels || !out || !cc || channels == 0 || count == 0) return 0;
     size_t out_i = 0;
-    for (uint16_t i = 0; i < strip->cfg.pixel_count; ++i) {
-        uint8_t *src = &strip->pixels[(size_t)i * strip->channels];
+    for (uint16_t i = 0; i < count; ++i) {
+        const uint8_t *src = &pixels[(size_t)i * channels];
         pm_rgb_t rgb = {src[0], src[1], src[2]};
-        rgb = pm_apply_correction(rgb, &strip->correction);
+        rgb = pm_apply_correction(rgb, cc);
 
         uint8_t ch[5] = {rgb.r, rgb.g, rgb.b, 0, 0};
-        if (strip->channels >= 4) {
-            /* re-derive whites after RGB correction */
-            if (strip->channels >= 5) {
-                pm_rgbww_t ww = pm_rgb_to_rgbww(rgb, strip->correction.auto_white, strip->correction.warm_mix);
-                ch[0] = ww.r; ch[1] = ww.g; ch[2] = ww.b; ch[3] = ww.w1; ch[4] = ww.w2;
-            } else {
-                pm_rgbw_t w = pm_rgb_to_rgbw(rgb, strip->correction.auto_white);
-                ch[0] = w.r; ch[1] = w.g; ch[2] = w.b; ch[3] = w.w;
-            }
+        if (channels >= 5) {
+            pm_rgbww_t ww = pm_rgb_to_rgbww(rgb, cc->auto_white, cc->warm_mix);
+            ch[0] = ww.r; ch[1] = ww.g; ch[2] = ww.b; ch[3] = ww.w1; ch[4] = ww.w2;
+        } else if (channels >= 4) {
+            pm_rgbw_t w = pm_rgb_to_rgbw(rgb, cc->auto_white);
+            ch[0] = w.r; ch[1] = w.g; ch[2] = w.b; ch[3] = w.w;
         }
 
         uint8_t packed[5];
         int plen = 0;
-        pm_pack_pixel(ch, strip->channels, strip->cfg.color_order, packed, &plen);
-        memcpy(&strip->tx_buf[out_i], packed, (size_t)plen);
+        pm_pack_pixel(ch, channels, order, packed, &plen);
+        if (out_i + (size_t)plen > out_cap) return 0;
+        memcpy(&out[out_i], packed, (size_t)plen);
         out_i += (size_t)plen;
     }
+    return out_i;
+}
+
+esp_err_t pm_led_strip_show(pm_led_strip_t *strip)
+{
+    ESP_RETURN_ON_FALSE(strip, ESP_ERR_INVALID_ARG, TAG, "null");
+
+    size_t out_i = pm_led_encode_frame(strip->pixels, strip->cfg.pixel_count, strip->channels,
+                                       strip->cfg.color_order, &strip->correction,
+                                       strip->tx_buf, strip->tx_buf_len);
+    ESP_RETURN_ON_FALSE(out_i > 0, ESP_ERR_INVALID_SIZE, TAG, "encode");
 
     rmt_transmit_config_t txcfg = {.loop_count = 0};
     ESP_RETURN_ON_ERROR(rmt_transmit(strip->rmt_chan, strip->bytes_encoder,

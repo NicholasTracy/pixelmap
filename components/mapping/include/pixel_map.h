@@ -34,6 +34,14 @@ void pm_pixel_map_destroy(pm_pixel_map_t *map);
 esp_err_t pm_pixel_map_set(pm_pixel_map_t *map, uint16_t slot, const pm_mapped_pixel_t *px);
 const pm_mapped_pixel_t *pm_pixel_map_get(const pm_pixel_map_t *map, uint16_t slot);
 uint16_t pm_pixel_map_count(const pm_pixel_map_t *map);
+uint16_t pm_pixel_map_capacity(const pm_pixel_map_t *map);
+
+/** Grow map storage in place (pointer to map stays valid). */
+esp_err_t pm_pixel_map_ensure_capacity(pm_pixel_map_t *map, uint16_t capacity);
+
+/** Persist / restore map JSON via stdio path (e.g. /spiffs/map.json). */
+esp_err_t pm_pixel_map_save_path(const pm_pixel_map_t *map, const char *path);
+esp_err_t pm_pixel_map_load_path(pm_pixel_map_t *map, const char *path);
 
 /* Build helpers. max_count = strip length (oversized lattices are stride-subsampled
  * so full dimensions are kept; unused strip pixels stay dark). */

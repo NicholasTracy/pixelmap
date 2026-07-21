@@ -4,6 +4,8 @@
 #include "esp_check.h"
 #include "cJSON.h"
 #include "led_chipsets.h"
+#include "color_engine.h"
+#include "pm_version.h"
 #include "pov.h"
 #include "effect_lua.h"
 #include <string.h>
@@ -82,10 +84,13 @@ static esp_err_t h_get_config(httpd_req_t *req)
 {
     pm_app_config_t *c = s_hooks.cfg;
     cJSON *o = cJSON_CreateObject();
+    cJSON_AddStringToObject(o, "ver", PIXELMAP_VERSION);
     cJSON_AddStringToObject(o, "ssid", c->sta_ssid);
-    cJSON_AddStringToObject(o, "pass", c->sta_pass);
+    /* Never echo Wi‑Fi password; UI only sends a new pass when the user types one. */
+    cJSON_AddBoolToObject(o, "passSet", c->sta_pass[0] != '\0');
     cJSON_AddStringToObject(o, "host", c->hostname);
     cJSON_AddNumberToObject(o, "gpio", c->gpio_data);
+    cJSON_AddNumberToObject(o, "clk", c->gpio_clock);
     cJSON_AddNumberToObject(o, "sled", c->gpio_status_led);
     cJSON_AddBoolToObject(o, "sledh", c->status_led_active_high);
     cJSON_AddNumberToObject(o, "count", c->pixel_count);
@@ -102,7 +107,9 @@ static esp_err_t h_get_config(httpd_req_t *req)
     }
     cJSON_AddNumberToObject(o, "bri", c->brightness);
     cJSON_AddNumberToObject(o, "gamma", c->gamma);
+    cJSON_AddBoolToObject(o, "aw", c->auto_white);
     cJSON_AddStringToObject(o, "chip", pm_chipset_name(c->chipset));
+    cJSON_AddStringToObject(o, "order", pm_color_order_name(c->color_order));
     cJSON_AddNumberToObject(o, "fx", c->effect_id);
     cJSON_AddNumberToObject(o, "speed", c->effect_speed);
     cJSON_AddNumberToObject(o, "scale", c->effect_scale);
@@ -145,6 +152,7 @@ static esp_err_t h_get_config(httpd_req_t *req)
     cJSON_AddNumberToObject(o, "fxmask", (double)pm_effect_param_mask(c->effect_id));
     cJSON_AddNumberToObject(o, "aun", c->artnet_universe);
     cJSON_AddNumberToObject(o, "sun", c->sacn_universe);
+    cJSON_AddNumberToObject(o, "ucnt", c->universe_count);
     cJSON_AddBoolToObject(o, "aen", c->artnet_enable);
     cJSON_AddBoolToObject(o, "sen", c->sacn_enable);
     cJSON_AddNumberToObject(o, "mw", c->map_width);
@@ -177,7 +185,8 @@ static esp_err_t h_post_config(httpd_req_t *req)
     cJSON *v;
     if ((v = cJSON_GetObjectItem(j, "ssid")) && cJSON_IsString(v))
         strncpy(c->sta_ssid, v->valuestring, sizeof(c->sta_ssid) - 1);
-    if ((v = cJSON_GetObjectItem(j, "pass")) && cJSON_IsString(v))
+    /* Empty / omitted pass keeps the previously stored password. */
+    if ((v = cJSON_GetObjectItem(j, "pass")) && cJSON_IsString(v) && v->valuestring[0] != '\0')
         strncpy(c->sta_pass, v->valuestring, sizeof(c->sta_pass) - 1);
     if ((v = cJSON_GetObjectItem(j, "host")) && cJSON_IsString(v))
         strncpy(c->hostname, v->valuestring, sizeof(c->hostname) - 1);
@@ -185,6 +194,7 @@ static esp_err_t h_post_config(httpd_req_t *req)
         c->gpio_data = (int)v->valuedouble;
         c->strip_gpio[0] = c->gpio_data;
     }
+    if ((v = cJSON_GetObjectItem(j, "clk")) && cJSON_IsNumber(v)) c->gpio_clock = (int)v->valuedouble;
     if ((v = cJSON_GetObjectItem(j, "sled")) && cJSON_IsNumber(v)) c->gpio_status_led = (int)v->valuedouble;
     if ((v = cJSON_GetObjectItem(j, "sledh"))) c->status_led_active_high = cJSON_IsTrue(v);
     if ((v = cJSON_GetObjectItem(j, "count")) && cJSON_IsNumber(v)) c->pixel_count = (uint16_t)v->valuedouble;
@@ -213,7 +223,16 @@ static esp_err_t h_post_config(httpd_req_t *req)
     pm_config_sync_strips(c);
     if ((v = cJSON_GetObjectItem(j, "bri")) && cJSON_IsNumber(v)) c->brightness = (uint8_t)v->valuedouble;
     if ((v = cJSON_GetObjectItem(j, "gamma")) && cJSON_IsNumber(v)) c->gamma = (uint8_t)v->valuedouble;
-    if ((v = cJSON_GetObjectItem(j, "chip")) && cJSON_IsString(v)) c->chipset = pm_chipset_from_name(v->valuestring);
+    if ((v = cJSON_GetObjectItem(j, "aw"))) c->auto_white = cJSON_IsTrue(v);
+    if ((v = cJSON_GetObjectItem(j, "chip")) && cJSON_IsString(v)) {
+        c->chipset = pm_chipset_from_name(v->valuestring);
+        if (c->chipset == PM_CHIPSET_APA102 || c->chipset == PM_CHIPSET_SK9822 ||
+            c->chipset == PM_CHIPSET_CUSTOM) {
+            c->chipset = PM_CHIPSET_WS2812B;
+        }
+    }
+    if ((v = cJSON_GetObjectItem(j, "order")) && cJSON_IsString(v))
+        c->color_order = pm_color_order_from_name(v->valuestring);
     if ((v = cJSON_GetObjectItem(j, "fx")) && cJSON_IsNumber(v)) {
         int fx = (int)v->valuedouble;
         c->effect_id = (fx >= 0 && fx < (int)PM_EFFECT_COUNT) ? (pm_effect_id_t)fx : PM_EFFECT_RAINBOW_SPATIAL;
@@ -330,6 +349,12 @@ static esp_err_t h_post_config(httpd_req_t *req)
     }
     if ((v = cJSON_GetObjectItem(j, "aen"))) c->artnet_enable = cJSON_IsTrue(v);
     if ((v = cJSON_GetObjectItem(j, "sen"))) c->sacn_enable = cJSON_IsTrue(v);
+    if ((v = cJSON_GetObjectItem(j, "ucnt")) && cJSON_IsNumber(v)) {
+        int uv = (int)v->valuedouble;
+        if (uv < 1) uv = 1;
+        if (uv > 16) uv = 16;
+        c->universe_count = (uint16_t)uv;
+    }
     /* Only one protocol at a time */
     if (c->artnet_enable && c->sacn_enable) c->sacn_enable = false;
     if ((v = cJSON_GetObjectItem(j, "mw")) && cJSON_IsNumber(v)) c->map_width = (uint16_t)v->valuedouble;

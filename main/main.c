@@ -2,6 +2,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_vfs_spiffs.h"
 #include "nvs_flash.h"
 
 #include "config_store.h"
@@ -17,6 +18,7 @@
 #include "status_led.h"
 
 static const char *TAG = "pixelmap";
+static const char *MAP_PATH = "/spiffs/map.json";
 
 static pm_app_config_t s_cfg;
 static pm_led_strip_t *s_buses[PM_STRIP_MAX];
@@ -28,6 +30,10 @@ static uint8_t *s_dmx_merge;
 static size_t s_dmx_merge_len;
 static volatile bool s_rebuild;
 static volatile bool s_strip_fault;
+static bool s_artnet_running;
+static bool s_sacn_running;
+
+static void on_dmx(uint16_t universe, const uint8_t *data, uint16_t len, void *user);
 
 static void destroy_buses(void)
 {
@@ -48,7 +54,7 @@ static void apply_correction(void)
         pm_color_correction_t cc = *pm_led_strip_get_correction(s_buses[i]);
         cc.brightness = s_cfg.brightness;
         cc.gamma = s_cfg.gamma;
-        cc.auto_white = s_cfg.auto_white;
+        cc.auto_white = s_cfg.auto_white; /* from Strip tab / API */
         /* FastLED-ish typical LED strip correction */
         cc.correction = (pm_rgb_t){255, 224, 204};
         cc.temperature = (pm_rgb_t){255, 255, 255};
@@ -102,10 +108,117 @@ static esp_err_t rebuild_strip(void)
     apply_correction();
 
     free(s_dmx_merge);
+    s_dmx_merge = NULL;
     s_dmx_merge_len = (size_t)s_total_len * 3;
-    s_dmx_merge = calloc(1, s_dmx_merge_len);
+    if (s_dmx_merge_len > 0) {
+        s_dmx_merge = calloc(1, s_dmx_merge_len);
+        if (!s_dmx_merge) {
+            ESP_LOGE(TAG, "dmx merge buffer alloc failed (%u bytes)", (unsigned)s_dmx_merge_len);
+            s_dmx_merge_len = 0;
+        }
+    }
+    if (s_map && s_total_len > 0) {
+        esp_err_t merr = pm_pixel_map_ensure_capacity(s_map, s_total_len);
+        if (merr != ESP_OK) {
+            ESP_LOGE(TAG, "map capacity grow failed: %s", esp_err_to_name(merr));
+        }
+    }
     ESP_LOGI(TAG, "buses=%u total_leds=%u", (unsigned)s_bus_count, (unsigned)s_total_len);
     return ESP_OK;
+}
+
+static void persist_map(void)
+{
+    if (!s_map) return;
+    esp_err_t err = pm_pixel_map_save_path(s_map, MAP_PATH);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "map save failed: %s", esp_err_to_name(err));
+    } else {
+        ESP_LOGI(TAG, "map persisted (%u points)", (unsigned)pm_pixel_map_count(s_map));
+    }
+}
+
+static void sync_dmx_receivers(void)
+{
+    if (s_artnet_running && !s_cfg.artnet_enable) {
+        pm_artnet_stop();
+        s_artnet_running = false;
+        ESP_LOGI(TAG, "Art-Net stopped");
+    }
+    if (s_sacn_running && !s_cfg.sacn_enable) {
+        pm_sacn_stop();
+        s_sacn_running = false;
+        ESP_LOGI(TAG, "sACN stopped");
+    }
+
+    if (s_cfg.artnet_enable) {
+        if (s_artnet_running) {
+            pm_artnet_stop();
+            s_artnet_running = false;
+        }
+        pm_artnet_config_t ac = {
+            .listen_port = 6454,
+            .universe_start = s_cfg.artnet_universe,
+            .universe_count = s_cfg.universe_count,
+            .on_dmx = on_dmx,
+            .user = &s_cfg.artnet_universe,
+        };
+        if (pm_artnet_start(&ac) == ESP_OK) {
+            s_artnet_running = true;
+            ESP_LOGI(TAG, "Art-Net started");
+        } else {
+            ESP_LOGW(TAG, "Art-Net start failed");
+        }
+    }
+
+    if (s_cfg.sacn_enable) {
+        if (s_sacn_running) {
+            pm_sacn_stop();
+            s_sacn_running = false;
+        }
+        pm_sacn_config_t sc = {
+            .universe_start = s_cfg.sacn_universe,
+            .universe_count = s_cfg.universe_count,
+            .join_multicast = true,
+            .on_dmx = on_dmx,
+            .user = &s_cfg.sacn_universe,
+        };
+        if (pm_sacn_start(&sc) == ESP_OK) {
+            s_sacn_running = true;
+            ESP_LOGI(TAG, "sACN started");
+        } else {
+            ESP_LOGW(TAG, "sACN start failed");
+        }
+    }
+}
+
+static void apply_wifi_from_cfg(void)
+{
+    pm_wifi_config_t wifi = {
+        .sta_ssid = s_cfg.sta_ssid,
+        .sta_pass = s_cfg.sta_pass,
+        .hostname = s_cfg.hostname,
+        .ap_fallback = s_cfg.ap_fallback,
+    };
+    esp_err_t err = pm_wifi_apply(&wifi);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "wifi apply failed: %s", esp_err_to_name(err));
+    }
+}
+
+static esp_err_t mount_spiffs(void)
+{
+    esp_vfs_spiffs_conf_t conf = {
+        .base_path = "/spiffs",
+        .partition_label = "storage",
+        .max_files = 4,
+        .format_if_mount_failed = true,
+    };
+    esp_err_t err = esp_vfs_spiffs_register(&conf);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "SPIFFS mount failed: %s", esp_err_to_name(err));
+    }
+    return err;
 }
 
 static void update_status_led(bool dmx_active)
@@ -217,12 +330,15 @@ static void on_config_changed(void)
 {
     s_rebuild = true;
     apply_correction();
-    apply_spatial_map();
+    /* Map points are owned by /api/map (+ SPIFFS). Layout params only seed
+     * a fresh map when no persisted map exists (boot). Avoid wiping wire-order. */
+    apply_wifi_from_cfg();
+    sync_dmx_receivers();
 }
 
 static void on_map_changed(void)
 {
-    /* map pointer already mutated in place */
+    persist_map();
 }
 
 static void set_px(void *user, uint16_t strip_index, pm_rgb_t color)
@@ -335,8 +451,17 @@ void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_init());
     }
 
-    ESP_ERROR_CHECK(pm_config_load(&s_cfg));
-    ESP_ERROR_CHECK(pm_effect_lua_init());
+    err = pm_config_load(&s_cfg);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "config load failed (%s); using defaults", esp_err_to_name(err));
+        pm_config_set_defaults(&s_cfg);
+    }
+    err = pm_effect_lua_init();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "lua init failed: %s", esp_err_to_name(err));
+    }
+
+    mount_spiffs();
 
     int avoid[PM_STRIP_MAX + 1];
     uint8_t avoid_n = 0;
@@ -355,12 +480,16 @@ void app_main(void)
     pm_status_led_tick();
 
     pm_pixel_map_config_t mc = {
-        /* Map size is limited by strip length */
         .capacity = s_cfg.pixel_count > 0 ? s_cfg.pixel_count : 512,
         .width = 1, .height = 1, .depth = 1,
     };
     ESP_ERROR_CHECK(pm_pixel_map_create(&mc, &s_map));
-    apply_spatial_map();
+    if (pm_pixel_map_load_path(s_map, MAP_PATH) == ESP_OK && pm_pixel_map_count(s_map) > 0) {
+        ESP_LOGI(TAG, "loaded persisted map (%u points)", (unsigned)pm_pixel_map_count(s_map));
+    } else {
+        apply_spatial_map();
+        persist_map();
+    }
 
     if (rebuild_strip() != ESP_OK) {
         pm_status_led_set_mode(PM_STATUS_FAULT_STRIP);
@@ -383,26 +512,7 @@ void app_main(void)
     };
     ESP_ERROR_CHECK(pm_web_ui_start(&ui));
 
-    if (s_cfg.artnet_enable) {
-        pm_artnet_config_t ac = {
-            .listen_port = 6454,
-            .universe_start = s_cfg.artnet_universe,
-            .universe_count = s_cfg.universe_count,
-            .on_dmx = on_dmx,
-            .user = &s_cfg.artnet_universe,
-        };
-        ESP_ERROR_CHECK(pm_artnet_start(&ac));
-    }
-    if (s_cfg.sacn_enable) {
-        pm_sacn_config_t sc = {
-            .universe_start = s_cfg.sacn_universe,
-            .universe_count = s_cfg.universe_count,
-            .join_multicast = true,
-            .on_dmx = on_dmx,
-            .user = &s_cfg.sacn_universe,
-        };
-        ESP_ERROR_CHECK(pm_sacn_start(&sc));
-    }
+    sync_dmx_receivers();
 
     xTaskCreate(render_loop, "render", 12288, NULL, 6, NULL);
     ESP_LOGI(TAG, "PixelMap ready — open http://%s/", pm_wifi_ip_str());

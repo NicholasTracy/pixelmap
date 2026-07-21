@@ -1,5 +1,17 @@
 #include "color_engine.h"
+#include <ctype.h>
 #include <string.h>
+
+static int order_ieq(const char *a, const char *b)
+{
+    if (!a || !b) return 0;
+    while (*a && *b) {
+        if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) return 0;
+        ++a;
+        ++b;
+    }
+    return *a == 0 && *b == 0;
+}
 
 static inline uint8_t qadd8(uint8_t a, uint8_t b)
 {
@@ -147,6 +159,37 @@ pm_rgbww_t pm_rgb_to_rgbww(pm_rgb_t in, bool auto_white, uint8_t warm_mix)
     o.w1 = scale8(base.w, 255 - warm_mix); /* cool */
     o.w2 = scale8(base.w, warm_mix);       /* warm */
     return o;
+}
+
+const char *pm_color_order_name(pm_color_order_t order)
+{
+    switch (order) {
+    case PM_COLOR_ORDER_RGB: return "RGB";
+    case PM_COLOR_ORDER_RBG: return "RBG";
+    case PM_COLOR_ORDER_GRB: return "GRB";
+    case PM_COLOR_ORDER_GBR: return "GBR";
+    case PM_COLOR_ORDER_BRG: return "BRG";
+    case PM_COLOR_ORDER_BGR: return "BGR";
+    case PM_COLOR_ORDER_RGBW: return "RGBW";
+    case PM_COLOR_ORDER_GRBW: return "GRBW";
+    case PM_COLOR_ORDER_WRGB: return "WRGB";
+    default: return "GRB";
+    }
+}
+
+pm_color_order_t pm_color_order_from_name(const char *name)
+{
+    if (!name) return PM_COLOR_ORDER_GRB;
+    if (order_ieq(name, "RGB")) return PM_COLOR_ORDER_RGB;
+    if (order_ieq(name, "RBG")) return PM_COLOR_ORDER_RBG;
+    if (order_ieq(name, "GRB")) return PM_COLOR_ORDER_GRB;
+    if (order_ieq(name, "GBR")) return PM_COLOR_ORDER_GBR;
+    if (order_ieq(name, "BRG")) return PM_COLOR_ORDER_BRG;
+    if (order_ieq(name, "BGR")) return PM_COLOR_ORDER_BGR;
+    if (order_ieq(name, "RGBW")) return PM_COLOR_ORDER_RGBW;
+    if (order_ieq(name, "GRBW")) return PM_COLOR_ORDER_GRBW;
+    if (order_ieq(name, "WRGB")) return PM_COLOR_ORDER_WRGB;
+    return PM_COLOR_ORDER_GRB;
 }
 
 void pm_pack_pixel(const uint8_t *channels, int channel_count,

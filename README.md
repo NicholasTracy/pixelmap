@@ -174,13 +174,16 @@ On the **Map** tab (when POV is off):
 | Control | Purpose |
 | --- | --- |
 | Dimension | 2D or 3D |
-| Layout | **Grid**, **Circle** (2D disk), or **Sphere** (3D filled volume) |
-| Circle fill | Concentric rings or filled square grid (circle layout only) |
+| Layout (2D) | **Grid**, **Circle**, or **Custom formula** |
+| Layout (3D) | **Box**, **Sphere**, **Cylinder**, **Dome**, **Pyramid**, or **Custom formula** |
+| Fill | Surface/rings vs solid lattice (shape-dependent) |
 | Pixel spacing | Neighbor pitch — preview uses a fixed world window so spacing visibly grows the layout |
-| Width / Height / Depth | Grid lattice size only |
+| Width / Height / Depth | Lattice size (meaning depends on layout) |
 | Edit wire order | Click LEDs in data-signal sequence so each map point gets the correct strip address |
 | Auto route | Axis order (all L→R / T→B / F→B permutations) plus **Start of each run** or **Zig-zag** |
 | Strip to route | When **Strip → Connected strips** is 2+, pick which strip’s wire order you are editing |
+
+Built maps (including wire order) are saved on the device and restored after reboot.
 
 On **Strip**, set **Connected strips** first. Each strip has its own **data GPIO** (WLED-style multi-bus defaults: 16, 2, 4, 13, …) and pixel count. Mapped LED count is capped by the sum of those lengths; oversized grids show a warning and are clipped.
 
@@ -264,8 +267,7 @@ PixelMap ships with pin defaults that match many WLED ESP32 layouts:
 |----------|------------|-------|
 | LED data (main) | 16 | Primary data line on many WLED boards |
 | Status LED | 2 | Onboard LED on most ESP32 DevKit-style boards |
-| LED clock | 14 | For clocked chips such as APA102 / SK9822 |
-| Button | 0 | Boot / recovery style button |
+| LED clock | 14 | Reserved in config/UI for future APA102 / SK9822 SPI |
 
 You can change the data pin in the web UI if your board uses a different layout.
 
@@ -294,9 +296,8 @@ If you assign GPIO 2 as LED data instead, the status LED is disabled automatical
 - WS2813
 - SK6812 RGBW
 - TM1814
-- APA102 / SK9822 (clocked / 4‑pin)
 
-Color handling includes RGB, RGBW, RGBWW-style mixing, HSV, gamma, and color correction.
+APA102 / SK9822 (SPI / clocked) are planned; they are hidden in the UI until the SPI driver lands. Color handling includes RGB, RGBW, HSV, gamma, and color correction.
 
 ---
 

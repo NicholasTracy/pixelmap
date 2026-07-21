@@ -34,7 +34,16 @@ void pm_led_strip_fill_rgb(pm_led_strip_t *strip, pm_rgb_t c);
 void pm_led_strip_set_correction(pm_led_strip_t *strip, const pm_color_correction_t *cc);
 const pm_color_correction_t *pm_led_strip_get_correction(const pm_led_strip_t *strip);
 
-/* Encode + transmit via RMT / SPI. Blocks until DMA/RMT queue accepts. */
+/**
+ * Pure encode path shared with host virtbench / tests.
+ * Applies correction, derives whites, packs color order into out[].
+ * Returns encoded byte count, or 0 on error / insufficient out_cap.
+ */
+size_t pm_led_encode_frame(const uint8_t *pixels, uint16_t count, uint8_t channels,
+                           pm_color_order_t order, const pm_color_correction_t *cc,
+                           uint8_t *out, size_t out_cap);
+
+/* Encode + transmit via RMT. Blocks until DMA/RMT queue accepts. */
 esp_err_t pm_led_strip_show(pm_led_strip_t *strip);
 
 #ifdef __cplusplus

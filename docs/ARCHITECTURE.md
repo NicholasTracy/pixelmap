@@ -1,5 +1,8 @@
 # PixelMap Architecture
 
+For project health, defects, missing features, and the phased roadmap, see
+[PROJECT_EVALUATION_AND_ROADMAP.md](./PROJECT_EVALUATION_AND_ROADMAP.md).
+
 ## Render path
 
 ```
@@ -9,20 +12,20 @@ map / Art-Net / sACN / UI
   effect engine  ──► per-pixel RGB (spatial eval)
         │
         ▼
-  color engine   ──► correction, gamma, temp, RGBW/RGBWW mix
+  color engine   ──► correction, gamma, temp, RGBW mix
         │
         ▼
-  led_driver     ──► pack color order ──► RMT NRZ (or clocked SPI path)
+  led_driver     ──► pm_led_encode_frame (pack) ──► RMT NRZ
         │
         ▼
-     GPIO data (/ clock)
+     GPIO data
 ```
 
 ## Control priority
 
 1. Live Art-Net or sACN within timeout (default 1.5s)
 2. Procedural spatial effect engine
-3. Clear / standby
+3. Idle / last frame (no separate standby mode yet)
 
 ## Spatial effects
 
@@ -34,7 +37,7 @@ When POV is enabled, `effects` asks `pov` for each pixel’s **instantaneous wor
 
 ## Bare-metal signaling
 
-WS281x / SK6812 / TM1814 use the ESP32 **RMT** TX peripheral with nanosecond timing tables (`led_chipsets.c`). Bit patterns are DMA-friendly via `rmt_bytes_encoder`. APA102 / SK9822 are modeled as clocked buses (SPI host binding is the intended production path).
+WS281x / SK6812 / TM1814 use the ESP32 **RMT** TX peripheral with nanosecond timing tables (`led_chipsets.c`). Bit patterns are DMA-friendly via `rmt_bytes_encoder`. APA102 / SK9822 SPI is **not implemented yet** (hidden in the UI).
 
 ## Status LED
 
@@ -42,15 +45,18 @@ WS281x / SK6812 / TM1814 use the ESP32 **RMT** TX peripheral with nanosecond tim
 
 ## Persistence
 
-`config_store` writes WiFi, strip, effect, and universe settings to NVS. Pixel maps are edited live through `/api/map` (persist map blobs to NVS/SPIFFS can be added next).
+`config_store` writes WiFi, strip, effect, and universe settings to NVS. Pixel map point clouds (including wire order) persist to SPIFFS at `/spiffs/map.json` whenever `/api/map` or `/api/map/grid` changes the map. On boot, the file is loaded if present; otherwise the map is regenerated from layout parameters in NVS.
 
 ## Web UI
 
-Embedded single-page app (`components/web_ui/www/index.html`) served by `esp_http_server`:
+Embedded single-page app (`components/web_ui/index.html`) served by `esp_http_server`:
 
 | Route | Purpose |
 |-------|---------|
 | `GET /` | Editor UI |
-| `GET/POST /api/config` | Device + strip + protocol settings |
-| `GET/POST /api/map` | Spatial map JSON |
-| `POST /api/map/grid` | Generate normalized grid |
+| `GET /vendor/bootstrap.min.css` | Bootstrap CSS (embedded) |
+| `GET /vendor/bootstrap.bundle.min.js` | Bootstrap JS (embedded) |
+| `GET/POST /api/config` | Device + strip + protocol settings (`pass` never returned on GET) |
+| `GET/POST /api/map` | Spatial map JSON (persisted to SPIFFS) |
+| `POST /api/map/grid` | Generate normalized lattice / shape |
+| `GET/POST /api/fx/lua` | Custom Lua effect script |
