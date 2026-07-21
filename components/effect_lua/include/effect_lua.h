@@ -39,7 +39,7 @@ typedef struct {
  * Evaluate one pixel. Globals:
  * t, speed, scale, intensity, i, count, x, y, z,
  * ph/ps/pv, sh/ss/sv, p1..p8 (and table p[1..8])
- * Helpers: hsv/rgb/lerp/clamp/noise*/math
+ * Helpers: hsv, rgb, lerp, clamp, noise, math
  */
 pm_rgb_t pm_effect_lua_eval(const pm_lua_effect_inputs_t *in,
                             uint16_t i, uint16_t count,

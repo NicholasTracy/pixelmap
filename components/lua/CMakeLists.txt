@@ -32,4 +32,8 @@ idf_component_register(
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC LUA_USE_C89)
 # Silence pedantic warnings from upstream Lua on GCC/Clang
-target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-unused-function -Wno-unused-parameter)
+target_compile_options(${COMPONENT_LIB} PRIVATE
+    -Wno-unused-function
+    -Wno-unused-parameter
+    -Wno-unused-value
+)
