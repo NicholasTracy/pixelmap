@@ -45,7 +45,7 @@ WS281x / SK6812 / TM1814 use the ESP32 **RMT** TX peripheral with nanosecond tim
 
 ## Persistence
 
-`config_store` writes WiFi, strip, effect, and universe settings to NVS. Pixel map point clouds (including wire order) persist to SPIFFS at `/spiffs/map.json` whenever `/api/map` or `/api/map/grid` changes the map. On boot, the file is loaded if present; otherwise the map is regenerated from layout parameters in NVS.
+`config_store` writes WiFi, strip, effect, and universe settings to NVS. Pixel map point clouds (including wire order) persist to the `storage` data partition (raw JSON blob via `map_store`) whenever `/api/map` or `/api/map/grid` changes the map. On boot, the blob is loaded if present; otherwise the map is regenerated from layout parameters in NVS.
 
 ## Web UI
 
