@@ -70,7 +70,12 @@ typedef struct {
     char sta_ssid[PM_WIFI_SSID_MAX];
     char sta_pass[PM_WIFI_PASS_MAX];
     char hostname[32];
+    /** SoftAP always on (APSTA when STA configured). */
+    bool ap_enable;
+    /** Bring SoftAP up if STA disconnects (recovery portal). */
     bool ap_fallback;
+    char ap_ssid[PM_WIFI_SSID_MAX];
+    char ap_pass[PM_WIFI_PASS_MAX];
 
     int gpio_data;                  /* alias of strip_gpio[0] (legacy / single-strip) */
     int gpio_clock;
@@ -127,7 +132,13 @@ typedef struct {
     float pov_radius_m;
     float pov_path_length_m;
 
-    /** Optional UI PIN (empty = open). Compared to X-PixelMap-Pin on mutating APIs. */
+    /**
+     * Opt-in web UI password. When web_auth is true and web_pass is set,
+     * all UI/API access requires a login session (except /api/auth).
+     * Legacy ui_pin (≤7 chars) still accepted as web_pass if web_pass empty.
+     */
+    bool web_auth;
+    char web_pass[33];
     char ui_pin[8];
     /** Estimated mA per LED at full white (UI power guidance). */
     uint16_t ma_per_led;

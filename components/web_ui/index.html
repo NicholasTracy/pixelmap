@@ -140,25 +140,74 @@ body{
   <div class="tab-content">
     <div class="tab-pane fade show active" id="pane-network">
       <div class="pm-panel">
-        <h2 class="pm-section-title">Wi‑Fi &amp; device</h2>
-        <div class="row g-3">
-          <div class="col-md-6"><label class="form-label" for="ssid">WiFi SSID</label><input class="form-control" id="ssid"/></div>
-          <div class="col-md-6"><label class="form-label" for="pass">WiFi Password</label><input class="form-control" id="pass" type="password" placeholder="Leave blank to keep current" autocomplete="new-password"/></div>
-          <div class="col-md-6"><label class="form-label" for="host">Hostname</label><input class="form-control" id="host"/>
-            <p class="pm-help mb-0 mt-1">Also advertised as <span id="mdnsHint">hostname</span>.local via mDNS.</p>
-          </div>
-          <div class="col-md-6"><label class="form-label" for="uipin">UI PIN (optional)</label>
-            <input class="form-control" id="uipin" type="password" maxlength="7" placeholder="Leave blank for open UI" autocomplete="new-password"/>
-            <p class="pm-help mb-0 mt-1" id="pinHint" hidden>A PIN is set — enter it here (or in session) to change settings.</p>
-          </div>
-        </div>
-        <p class="pm-help mt-2 mb-0" id="passHint" hidden>A Wi‑Fi password is stored on the device (not shown).</p>
-        <button class="btn btn-pm-primary mt-3" type="button" id="saveNetwork">Save network settings</button>
-        <div class="pm-status" id="statusNetwork"></div>
+        <h2 class="pm-section-title">Connection status</h2>
+        <p class="pm-help mb-2" id="wifiStatusLine">Mode — · STA — · AP —</p>
+        <p class="pm-help mb-0">OTA works over SoftAP (<code>192.168.4.1</code>) and over STA. Keep SoftAP enabled while updating from a phone hotspot if needed.</p>
       </div>
       <div class="pm-panel mt-3">
+        <h2 class="pm-section-title">Wi‑Fi client (STA)</h2>
+        <div class="row g-3">
+          <div class="col-md-8"><label class="form-label" for="ssid">Network SSID</label>
+            <div class="input-group">
+              <input class="form-control" id="ssid" list="ssidList"/>
+              <button class="btn btn-outline-secondary" type="button" id="wifiScan">Scan</button>
+            </div>
+            <datalist id="ssidList"></datalist>
+          </div>
+          <div class="col-md-4"><label class="form-label" for="pass">Password</label>
+            <input class="form-control" id="pass" type="password" placeholder="Leave blank to keep" autocomplete="new-password"/>
+          </div>
+          <div class="col-12"><div id="wifiScanResults" class="d-flex flex-column gap-1"></div>
+            <p class="pm-help mb-0 mt-1" id="wifiScanHint"></p>
+          </div>
+          <div class="col-md-6"><label class="form-label" for="host">Hostname</label>
+            <input class="form-control" id="host"/>
+            <p class="pm-help mb-0 mt-1">mDNS: <span id="mdnsHint">hostname</span>.local</p>
+          </div>
+        </div>
+        <p class="pm-help mt-2 mb-0" id="passHint" hidden>A STA password is stored on the device (not shown).</p>
+      </div>
+      <div class="pm-panel mt-3">
+        <h2 class="pm-section-title">SoftAP (access point)</h2>
+        <p class="pm-help">Combine with client mode (APSTA) so phones can always reach the UI at <code>192.168.4.1</code> while the device is also on your LAN.</p>
+        <div class="row g-3">
+          <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="apen"/>
+            <label class="form-check-label" for="apen">Enable SoftAP (always on)</label>
+          </div></div>
+          <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="apfb" checked/>
+            <label class="form-check-label" for="apfb">AP fallback if STA disconnects</label>
+          </div></div>
+          <div class="col-md-6"><label class="form-label" for="apssid">AP SSID</label>
+            <input class="form-control" id="apssid" placeholder="Blank → PixelMap-XXXX"/>
+          </div>
+          <div class="col-md-6"><label class="form-label" for="appass">AP password</label>
+            <input class="form-control" id="appass" type="password" placeholder="Leave blank to keep (min 8)" autocomplete="new-password"/>
+            <p class="pm-help mb-0 mt-1" id="apPassHint" hidden>An AP password is stored (not shown). Default first boot: <code>pixelmap1</code>.</p>
+          </div>
+        </div>
+      </div>
+      <div class="pm-panel mt-3">
+        <h2 class="pm-section-title">Secure web UI</h2>
+        <p class="pm-help">Opt-in password gate for the entire UI (including OTA). After enabling, you’ll be asked to sign in.</p>
+        <div class="row g-3">
+          <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="webAuth"/>
+            <label class="form-check-label" for="webAuth">Require password to open web UI</label>
+          </div></div>
+          <div class="col-md-6"><label class="form-label" for="webpass">Web UI password</label>
+            <input class="form-control" id="webpass" type="password" maxlength="32" placeholder="Leave blank to keep / clear when disabling" autocomplete="new-password"/>
+            <p class="pm-help mb-0 mt-1" id="pinHint" hidden>A web password is set.</p>
+          </div>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm mt-2" type="button" id="webLogout">Sign out this browser</button>
+      </div>
+      <button class="btn btn-pm-primary mt-3" type="button" id="saveNetwork">Save network settings</button>
+      <div class="pm-status" id="statusNetwork"></div>
+      <div class="pm-panel mt-3">
         <h2 class="pm-section-title">Firmware update (OTA)</h2>
-        <p class="pm-help">Upload a <code>pixelmap.bin</code> (app image). Device reboots when done. Running partition: <strong id="otaPart">—</strong></p>
+        <p class="pm-help">Upload a <code>pixelmap.bin</code> app image (not the merged flash file). Works over SoftAP or STA. Running partition: <strong id="otaPart">—</strong></p>
         <input class="form-control" type="file" id="otaFile" accept=".bin"/>
         <button class="btn btn-pm-primary mt-3" type="button" id="otaUpload">Upload &amp; reboot</button>
         <div class="pm-status" id="statusOta"></div>
@@ -1373,14 +1422,17 @@ function applyFxConfig(c){
 
 function apiHeaders(extra){
   const h = Object.assign({'Content-Type':'application/json'}, extra || {});
-  let pin = '';
-  try { pin = sessionStorage.getItem('pm_pin') || ''; } catch (_) {}
-  const typed = (document.getElementById('uipin') && uipin.value) || '';
+  let tok = '';
+  try { tok = sessionStorage.getItem('pm_auth') || sessionStorage.getItem('pm_pin') || ''; } catch (_) {}
+  const typed = (document.getElementById('webpass') && webpass.value) || '';
   if (typed) {
-    pin = typed;
-    try { sessionStorage.setItem('pm_pin', typed); } catch (_) {}
+    tok = typed;
+    try { sessionStorage.setItem('pm_auth', typed); } catch (_) {}
   }
-  if (pin) h['X-PixelMap-Pin'] = pin;
+  if (tok) {
+    h['X-PixelMap-Auth'] = tok;
+    h['X-PixelMap-Pin'] = tok; /* legacy */
+  }
   return h;
 }
 
@@ -1404,6 +1456,10 @@ function collectConfig(){
   const fxc = collectFxConfig();
   const body = {
     ssid:ssid.value, host:host.value,
+    apen:!!document.getElementById('apen')?.checked,
+    apfb:!!document.getElementById('apfb')?.checked,
+    apssid:(document.getElementById('apssid')?.value || '').trim(),
+    webAuth:!!document.getElementById('webAuth')?.checked,
     gpio:+gpio.value, clk:+clk.value, sled:+sled.value, sledh:sledh.checked,
     count:total, scnt:stripCount(), slens, sgpios,
     bri:+bri.value, gamma:+gamma.value, aw:!!aw.checked,
@@ -1427,18 +1483,31 @@ function collectConfig(){
     povrpm:+povrpm.value, povspd:+povspd.value, povrad:+povrad.value, povpath:+povpath.value
   };
   if (pass.value) body.pass = pass.value;
-  if (document.getElementById('uipin') && uipin.value !== '') body.uipin = uipin.value;
+  if (document.getElementById('appass') && appass.value) body.appass = appass.value;
+  if (document.getElementById('webpass') && webpass.value !== '') body.webpass = webpass.value;
   return body;
 }
 
 async function saveConfig(statusEl, note){
   const body = collectConfig();
   const r = await fetch('/api/config',{method:'POST',headers:apiHeaders(),body:JSON.stringify(body)});
-  const msg = r.status === 403 ? 'PIN required or incorrect' : (r.ok ? (note || 'Saved.') : 'Save failed');
+  let errDetail = '';
+  let j = null;
+  try { j = await r.json(); } catch (_) {}
+  if (!r.ok && j && j.error) errDetail = j.error;
+  const msg = (r.status === 401 || r.status === 403)
+    ? 'Password required or incorrect'
+    : (r.ok ? (note || 'Saved.') : (errDetail || 'Save failed'));
   setStatus(statusEl, r.ok, msg);
-  if (r.ok && pass.value) pass.value = '';
+  if (r.ok) {
+    if (pass.value) pass.value = '';
+    if (j && j.token) {
+      try { sessionStorage.setItem('pm_auth', j.token); } catch (_) {}
+    }
+  }
   updateGates();
   updatePowerEst();
+  return r.ok;
 }
 
 /** Shapes available per dimension — Custom is in both. */
@@ -2008,11 +2077,19 @@ async function loadCfg(){
   ssid.value=c.ssid||''; pass.value=''; host.value=c.host||'pixelmap';
   const passHint = document.getElementById('passHint');
   if (passHint) passHint.hidden = !c.passSet;
+  if (document.getElementById('apen')) apen.checked = !!c.apen;
+  if (document.getElementById('apfb')) apfb.checked = c.apfb !== false;
+  if (document.getElementById('apssid')) apssid.value = c.apssid || '';
+  if (document.getElementById('appass')) appass.value = '';
+  const apPassHint = document.getElementById('apPassHint');
+  if (apPassHint) apPassHint.hidden = !c.apPassSet;
+  if (document.getElementById('webAuth')) webAuth.checked = !!c.webAuth;
+  if (document.getElementById('webpass')) webpass.value = '';
   const pinHint = document.getElementById('pinHint');
-  if (pinHint) pinHint.hidden = !c.pinSet;
-  if (document.getElementById('uipin')) uipin.value = '';
+  if (pinHint) pinHint.hidden = !(c.webPassSet || c.pinSet);
   const mdnsHint = document.getElementById('mdnsHint');
   if (mdnsHint) mdnsHint.textContent = c.host || 'pixelmap';
+  refreshWifiStatus();
   if (document.getElementById('otaPart')) otaPart.textContent = c.otaPart || '—';
   if (document.getElementById('maled')) maled.value = c.maled != null ? c.maled : 60;
   if (document.getElementById('sminp')) sminp.value = c.sminp != null ? c.sminp : 0;
@@ -4391,7 +4468,84 @@ fetch('/api/fx/lua').then(r => r.ok ? r.json() : null).then(j => {
   }
 }).catch(() => {});
 
-saveNetwork.onclick=()=>saveConfig(statusNetwork,'Saved. Wi‑Fi credentials apply immediately.');
+async function refreshWifiStatus(){
+  try {
+    const r = await fetch('/api/wifi/status', {headers: apiHeaders()});
+    if (!r.ok) return;
+    const j = await r.json();
+    const line = document.getElementById('wifiStatusLine');
+    if (line) {
+      line.textContent = 'Mode ' + (j.mode || '?')
+        + ' · STA ' + (j.sta ? (j.staSsid + ' @ ' + j.staIp) : (j.staConnecting ? 'connecting…' : 'down'))
+        + ' · AP ' + (j.ap ? (j.apSsid + ' @ ' + j.apIp) : 'off');
+    }
+    if (j.otaPart && document.getElementById('otaPart')) otaPart.textContent = j.otaPart;
+  } catch (_) {}
+}
+
+document.getElementById('wifiScan')?.addEventListener('click', async () => {
+  const hint = document.getElementById('wifiScanHint');
+  const box = document.getElementById('wifiScanResults');
+  const list = document.getElementById('ssidList');
+  if (hint) hint.textContent = 'Scanning…';
+  if (box) box.innerHTML = '';
+  try {
+    const r = await fetch('/api/wifi/scan', {headers: apiHeaders()});
+    const j = await r.json();
+    if (!r.ok || !j.ok) {
+      if (hint) hint.textContent = j.error || 'Scan failed';
+      return;
+    }
+    const aps = j.aps || [];
+    if (list) {
+      list.innerHTML = '';
+      aps.forEach(a => {
+        const o = document.createElement('option');
+        o.value = a.ssid;
+        list.appendChild(o);
+      });
+    }
+    if (box) {
+      aps.forEach(a => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn btn-sm btn-outline-secondary text-start';
+        b.textContent = a.ssid + '  (' + a.rssi + ' dBm' + (a.open ? ', open' : '') + ')';
+        b.onclick = () => { ssid.value = a.ssid; };
+        box.appendChild(b);
+      });
+    }
+    if (hint) hint.textContent = aps.length ? (aps.length + ' networks') : 'No networks found';
+  } catch (e) {
+    if (hint) hint.textContent = 'Scan failed';
+  }
+});
+
+document.getElementById('webLogout')?.addEventListener('click', async () => {
+  try { sessionStorage.removeItem('pm_auth'); sessionStorage.removeItem('pm_pin'); } catch (_) {}
+  await fetch('/api/auth/logout', {method:'POST', headers: apiHeaders(), body:'{}'});
+  location.reload();
+});
+
+saveNetwork.onclick=async()=>{
+  const haveWebPass = document.getElementById('pinHint') && !pinHint.hidden;
+  if (webAuth.checked && !webpass.value && !haveWebPass) {
+    setStatus(statusNetwork, false, 'Set a web UI password when enabling secure UI');
+    return;
+  }
+  if (appass.value && appass.value.length < 8) {
+    setStatus(statusNetwork, false, 'AP password must be at least 8 characters');
+    return;
+  }
+  const ok = await saveConfig(statusNetwork,'Saved. Wi‑Fi / SoftAP apply immediately.');
+  if (ok) {
+    if (appass.value) appass.value = '';
+    if (webpass.value) webpass.value = '';
+    loadCfg();
+  }
+  refreshWifiStatus();
+};
+setInterval(refreshWifiStatus, 5000);
 saveStrip.onclick=async()=>{
   await saveConfig(statusStrip,'Strip settings saved.');
   syncStripTotal();
@@ -4454,7 +4608,7 @@ document.getElementById('otaUpload')?.addEventListener('click', async () => {
     headers['Content-Type'] = 'application/octet-stream';
     const r = await fetch('/api/ota', {method:'POST', headers, body: buf});
     if (r.ok) setStatus(statusOta, true, 'OTA OK — rebooting…');
-    else setStatus(statusOta, false, r.status === 403 ? 'PIN required' : 'OTA failed');
+    else setStatus(statusOta, false, (r.status === 401 || r.status === 403) ? 'Password required' : 'OTA failed');
   } catch (e) {
     setStatus(statusOta, false, 'Upload failed');
   }
@@ -4463,7 +4617,7 @@ document.getElementById('otaUpload')?.addEventListener('click', async () => {
 document.getElementById('factoryReset')?.addEventListener('click', async () => {
   if (!confirm('Factory reset erases config, map, presets, and Lua. Continue?')) return;
   const r = await fetch('/api/factory_reset', {method:'POST', headers:apiHeaders(), body:'{}'});
-  setStatus(statusFactory, r.ok, r.ok ? 'Reset OK — rebooting…' : (r.status===403?'PIN required':'Reset failed'));
+  setStatus(statusFactory, r.ok, r.ok ? 'Reset OK — rebooting…' : ((r.status===401||r.status===403)?'Password required':'Reset failed'));
 });
 
 buildGrid.onclick=async()=>{

@@ -297,15 +297,38 @@ If you assign GPIO 2 as LED data instead, the status LED is disabled automatical
 - SK6812 RGBW
 - TM1814
 
-APA102 / SK9822 use SPI (data + clock GPIO; one strip on SPI2). Color handling includes RGB, RGBW, HSV, gamma, and color correction. Web OTA, mDNS (`hostname.local`), effect presets, optional UI PIN, and factory reset are available in the Network / Control tabs.
+APA102 / SK9822 use SPI (data + clock GPIO; one strip on SPI2). Color handling includes RGB, RGBW, HSV, gamma, and color correction. Web OTA, SoftAP / APSTA, mDNS (`hostname.local`), effect presets, optional secure web UI password, and factory reset are available in the Network tab.
 
 **Audio reactive:** optional I2S MEMS mic (INMP441-style). Enable under the Audio tab (WS / BCLK / DOUT GPIOs, gain, squelch). Use effects **Audio Pulse**, **Audio Ripple**, **Audio Spectrum**, or turn on “modulate intensity” for any effect. Bluetooth is not included.
 
 ---
 
+## Wi‑Fi, SoftAP, and OTA
+
+On first boot (or when STA is not configured), PixelMap starts a SoftAP:
+
+| | |
+|--|--|
+| SSID | `PixelMap-XXXX` (last bytes of MAC), or a custom AP SSID |
+| Password | `pixelmap1` by default (change in Network → SoftAP; min 8 chars) |
+| UI | `http://192.168.4.1/` |
+
+In the **Network** tab you can:
+
+- **Scan** for nearby Wi‑Fi networks and join as a client (STA)
+- **Enable SoftAP always** (APSTA) so phones can still reach `192.168.4.1` while the device is on your LAN
+- Use **AP fallback** (default on) so SoftAP comes up if STA disconnects
+- Opt in to a **secure web UI** password (login required for the whole UI, including OTA)
+
+**Web OTA:** Network → Firmware update. Upload the release **app** image (`pixelmap-esp32.bin` / `pixelmap-esp32s3.bin`), not the merged full-flash file. OTA works over SoftAP or STA (dual OTA partitions). Keep SoftAP enabled if you are updating from a phone without LAN access.
+
+---
+
 ## Updating PixelMap later
 
-When a new version is published on the Releases page:
+**Preferred — web OTA:** open the UI (LAN or SoftAP), Network → Firmware update, upload the newer **app** `.bin`, wait for reboot.
+
+**Full reflash:** when a new version is published on the Releases page:
 
 1. Download the newer **merged** `.bin` for your board
 2. Flash it the same way you did the first time (address `0x0`)

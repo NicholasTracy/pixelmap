@@ -15,6 +15,8 @@
 #include "presets.h"
 #include "map_store.h"
 #include "audio.h"
+#include "wifi_mgr.h"
+#include "esp_random.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -23,6 +25,23 @@
 static const char *TAG = "web_ui";
 static httpd_handle_t s_server;
 static pm_web_ui_hooks_t s_hooks;
+static char s_session[33];
+
+static const char *LOGIN_HTML =
+    "<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\">"
+    "<title>PixelMap Login</title><style>"
+    "body{font-family:system-ui,sans-serif;background:#1a1d21;color:#e8eaed;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}"
+    ".card{background:#23272c;padding:1.5rem;border-radius:12px;width:min(22rem,92vw);box-shadow:0 8px 32px #0006}"
+    "h1{font-size:1.25rem;margin:0 0 .5rem}p{color:#9aa0a6;font-size:.9rem;margin:0 0 1rem}"
+    "input{width:100%;box-sizing:border-box;padding:.65rem .75rem;border-radius:8px;border:1px solid #3c4043;background:#121417;color:#e8eaed}"
+    "button{margin-top:.85rem;width:100%;padding:.7rem;border:0;border-radius:8px;background:#3d6b8c;color:#fff;font-weight:600;cursor:pointer}"
+    ".err{color:#f28b82;font-size:.85rem;margin-top:.6rem;min-height:1.2em}"
+    "</style></head><body><div class=card><h1>PixelMap</h1><p>Enter the web UI password to continue. SoftAP and OTA work after login.</p>"
+    "<input id=p type=password autocomplete=current-password placeholder=\"Password\">"
+    "<button id=b type=button>Sign in</button><div class=err id=e></div></div>"
+    "<script>async function go(){e.textContent='';const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},"
+    "body:JSON.stringify({pass:p.value})});const j=await r.json().catch(()=>({}));if(r.ok&&j.ok){try{sessionStorage.setItem('pm_auth',j.token)}catch(_){}"
+    "location.href='/'}else e.textContent=j.error||'Login failed'}b.onclick=go;p.onkeydown=ev=>{if(ev.key==='Enter')go()}</script></body></html>";
 
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
@@ -43,21 +62,100 @@ static esp_err_t send_json(httpd_req_t *req, cJSON *obj)
     return err;
 }
 
-static bool pin_ok(httpd_req_t *req)
+static const char *stored_ui_password(void)
 {
     pm_app_config_t *c = s_hooks.cfg;
-    if (!c || !c->ui_pin[0]) return true;
-    char hdr[16] = {0};
-    if (httpd_req_get_hdr_value_str(req, "X-PixelMap-Pin", hdr, sizeof(hdr)) != ESP_OK) {
+    if (!c) return "";
+    if (c->web_pass[0]) return c->web_pass;
+    return c->ui_pin;
+}
+
+static bool web_auth_enabled(void)
+{
+    pm_app_config_t *c = s_hooks.cfg;
+    return c && c->web_auth && stored_ui_password()[0] != '\0';
+}
+
+static bool extract_session_token(httpd_req_t *req, char *out, size_t out_len)
+{
+    if (!out || out_len < 2) return false;
+    out[0] = 0;
+    if (httpd_req_get_hdr_value_str(req, "X-PixelMap-Auth", out, out_len) == ESP_OK && out[0]) {
+        return true;
+    }
+    /* Legacy mutating PIN header when auth is session-based still accepted as token match below */
+    if (httpd_req_get_hdr_value_str(req, "X-PixelMap-Pin", out, out_len) == ESP_OK && out[0]) {
+        return true;
+    }
+    char cookie[192] = {0};
+    if (httpd_req_get_hdr_value_str(req, "Cookie", cookie, sizeof(cookie)) != ESP_OK) return false;
+    const char *p = strstr(cookie, "pm_sess=");
+    if (!p) return false;
+    p += 8;
+    size_t i = 0;
+    while (p[i] && p[i] != ';' && i + 1 < out_len) {
+        out[i] = p[i];
+        i++;
+    }
+    out[i] = 0;
+    return out[0] != 0;
+}
+
+static bool session_ok(httpd_req_t *req)
+{
+    if (!web_auth_enabled()) return true;
+    char tok[40] = {0};
+    if (!extract_session_token(req, tok, sizeof(tok))) return false;
+    if (s_session[0] && strcmp(tok, s_session) == 0) return true;
+    /* Also accept the password itself (handy right after enabling auth). */
+    const char *pass = stored_ui_password();
+    return pass[0] && strcmp(tok, pass) == 0;
+}
+
+/** Full UI gate when web_auth enabled; otherwise optional legacy PIN on mutating calls. */
+static bool auth_ok(httpd_req_t *req, bool mutating)
+{
+    if (web_auth_enabled()) return session_ok(req);
+    if (!mutating) return true;
+    const char *pin = stored_ui_password();
+    if (!pin[0]) return true;
+    char hdr[40] = {0};
+    if (httpd_req_get_hdr_value_str(req, "X-PixelMap-Pin", hdr, sizeof(hdr)) != ESP_OK &&
+        httpd_req_get_hdr_value_str(req, "X-PixelMap-Auth", hdr, sizeof(hdr)) != ESP_OK) {
         return false;
     }
-    return strcmp(hdr, c->ui_pin) == 0;
+    return strcmp(hdr, pin) == 0;
 }
+
+static bool pin_ok(httpd_req_t *req) { return auth_ok(req, true); }
 
 static esp_err_t reject_pin(httpd_req_t *req)
 {
-    httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "pin required");
+    httpd_resp_set_status(req, "401 Unauthorized");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"auth required\"}");
     return ESP_FAIL;
+}
+
+static esp_err_t reject_auth_page(httpd_req_t *req)
+{
+    httpd_resp_set_status(req, "401 Unauthorized");
+    httpd_resp_set_type(req, "text/html");
+    return httpd_resp_send(req, LOGIN_HTML, HTTPD_RESP_USE_STRLEN);
+}
+
+static void mint_session(char *out, size_t out_len)
+{
+    uint8_t raw[16];
+    esp_fill_random(raw, sizeof(raw));
+    static const char *hex = "0123456789abcdef";
+    size_t n = (out_len - 1) / 2;
+    if (n > sizeof(raw)) n = sizeof(raw);
+    for (size_t i = 0; i < n; ++i) {
+        out[i * 2] = hex[(raw[i] >> 4) & 0xf];
+        out[i * 2 + 1] = hex[raw[i] & 0xf];
+    }
+    out[n * 2] = 0;
 }
 
 static void reboot_soon_task(void *arg)
@@ -95,6 +193,9 @@ static cJSON *read_body_json(httpd_req_t *req)
 
 static esp_err_t h_index(httpd_req_t *req)
 {
+    if (web_auth_enabled() && !session_ok(req)) {
+        return reject_auth_page(req);
+    }
     httpd_resp_set_type(req, "text/html");
     return httpd_resp_send(req, (const char *)index_html_start,
                            index_html_end - index_html_start);
@@ -118,6 +219,7 @@ static esp_err_t h_bootstrap_js(httpd_req_t *req)
 
 static esp_err_t h_get_config(httpd_req_t *req)
 {
+    if (!auth_ok(req, false)) return reject_pin(req);
     pm_app_config_t *c = s_hooks.cfg;
     pm_config_lock();
     cJSON *o = cJSON_CreateObject();
@@ -125,7 +227,13 @@ static esp_err_t h_get_config(httpd_req_t *req)
     cJSON_AddStringToObject(o, "ssid", c->sta_ssid);
     /* Never echo Wi‑Fi password; UI only sends a new pass when the user types one. */
     cJSON_AddBoolToObject(o, "passSet", c->sta_pass[0] != '\0');
-    cJSON_AddBoolToObject(o, "pinSet", c->ui_pin[0] != '\0');
+    cJSON_AddBoolToObject(o, "webAuth", c->web_auth);
+    cJSON_AddBoolToObject(o, "webPassSet", stored_ui_password()[0] != '\0');
+    cJSON_AddBoolToObject(o, "pinSet", stored_ui_password()[0] != '\0'); /* legacy alias */
+    cJSON_AddBoolToObject(o, "apen", c->ap_enable);
+    cJSON_AddBoolToObject(o, "apfb", c->ap_fallback);
+    cJSON_AddStringToObject(o, "apssid", c->ap_ssid);
+    cJSON_AddBoolToObject(o, "apPassSet", c->ap_pass[0] != '\0');
     cJSON_AddStringToObject(o, "host", c->hostname);
     cJSON_AddStringToObject(o, "otaPart", pm_ota_running_label());
     cJSON_AddNumberToObject(o, "maled", c->ma_per_led);
@@ -241,6 +349,52 @@ static esp_err_t h_post_config(httpd_req_t *req)
         strncpy(c->sta_pass, v->valuestring, sizeof(c->sta_pass) - 1);
     if ((v = cJSON_GetObjectItem(j, "host")) && cJSON_IsString(v))
         strncpy(c->hostname, v->valuestring, sizeof(c->hostname) - 1);
+    if ((v = cJSON_GetObjectItem(j, "apen"))) c->ap_enable = cJSON_IsTrue(v);
+    if ((v = cJSON_GetObjectItem(j, "apfb"))) c->ap_fallback = cJSON_IsTrue(v);
+    if ((v = cJSON_GetObjectItem(j, "apssid")) && cJSON_IsString(v)) {
+        strncpy(c->ap_ssid, v->valuestring, sizeof(c->ap_ssid) - 1);
+        c->ap_ssid[sizeof(c->ap_ssid) - 1] = '\0';
+    }
+    if ((v = cJSON_GetObjectItem(j, "appass")) && cJSON_IsString(v) && v->valuestring[0] != '\0') {
+        size_t alen = strlen(v->valuestring);
+        if (alen < 8) {
+            pm_config_unlock();
+            cJSON_Delete(j);
+            httpd_resp_set_status(req, "400 Bad Request");
+            httpd_resp_set_type(req, "application/json");
+            return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"AP password must be at least 8 characters\"}");
+        }
+        strncpy(c->ap_pass, v->valuestring, sizeof(c->ap_pass) - 1);
+        c->ap_pass[sizeof(c->ap_pass) - 1] = '\0';
+    }
+    bool auth_changed = false;
+    bool want_web_auth = c->web_auth;
+    if ((v = cJSON_GetObjectItem(j, "webAuth"))) want_web_auth = cJSON_IsTrue(v);
+    if ((v = cJSON_GetObjectItem(j, "webpass")) && cJSON_IsString(v)) {
+        strncpy(c->web_pass, v->valuestring, sizeof(c->web_pass) - 1);
+        c->web_pass[sizeof(c->web_pass) - 1] = '\0';
+        /* Keep legacy pin field in sync when short */
+        if (strlen(c->web_pass) < sizeof(c->ui_pin)) {
+            strncpy(c->ui_pin, c->web_pass, sizeof(c->ui_pin) - 1);
+            c->ui_pin[sizeof(c->ui_pin) - 1] = '\0';
+        } else {
+            c->ui_pin[0] = '\0';
+        }
+        auth_changed = true;
+        if (c->web_pass[0] == '\0') {
+            c->ui_pin[0] = '\0';
+            s_session[0] = '\0';
+        }
+    }
+    if (want_web_auth && stored_ui_password()[0] == '\0') {
+        pm_config_unlock();
+        cJSON_Delete(j);
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"web password required when auth enabled\"}");
+    }
+    if (want_web_auth != c->web_auth) auth_changed = true;
+    c->web_auth = want_web_auth;
     if ((v = cJSON_GetObjectItem(j, "gpio")) && cJSON_IsNumber(v)) {
         c->gpio_data = (int)v->valuedouble;
         c->strip_gpio[0] = c->gpio_data;
@@ -465,12 +619,22 @@ static esp_err_t h_post_config(httpd_req_t *req)
     pm_config_save(c);
     pm_config_unlock();
     if (s_hooks.on_config_changed) s_hooks.on_config_changed();
-    httpd_resp_set_type(req, "application/json");
-    return httpd_resp_sendstr(req, "{\"ok\":true}");
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddBoolToObject(resp, "ok", true);
+    if (auth_changed && web_auth_enabled()) {
+        mint_session(s_session, sizeof(s_session));
+        char cookie[96];
+        snprintf(cookie, sizeof(cookie), "pm_sess=%s; Path=/; Max-Age=86400; SameSite=Lax", s_session);
+        httpd_resp_set_hdr(req, "Set-Cookie", cookie);
+        cJSON_AddStringToObject(resp, "token", s_session);
+    }
+    return send_json(req, resp);
 }
 
 static esp_err_t h_get_map(httpd_req_t *req)
 {
+    if (!auth_ok(req, false)) return reject_pin(req);
     size_t need = (size_t)pm_pixel_map_count(s_hooks.map) * 64 + 4;
     char *buf = malloc(need);
     if (!buf) return ESP_ERR_NO_MEM;
@@ -608,6 +772,7 @@ static esp_err_t h_post_grid(httpd_req_t *req)
 
 static esp_err_t h_get_fx_lua(httpd_req_t *req)
 {
+    if (!auth_ok(req, false)) return reject_pin(req);
     cJSON *o = cJSON_CreateObject();
     cJSON_AddStringToObject(o, "script", pm_effect_lua_get_script());
     cJSON_AddBoolToObject(o, "ready", pm_effect_lua_ready());
@@ -645,6 +810,7 @@ static esp_err_t h_post_fx_lua(httpd_req_t *req)
 
 static esp_err_t h_get_ota(httpd_req_t *req)
 {
+    if (!auth_ok(req, false)) return reject_pin(req);
     cJSON *o = cJSON_CreateObject();
     cJSON_AddStringToObject(o, "part", pm_ota_running_label());
     cJSON_AddBoolToObject(o, "busy", pm_ota_in_progress());
@@ -696,6 +862,7 @@ static esp_err_t h_post_ota(httpd_req_t *req)
 
 static esp_err_t h_get_presets(httpd_req_t *req)
 {
+    if (!auth_ok(req, false)) return reject_pin(req);
     cJSON *o = cJSON_CreateObject();
     cJSON *arr = cJSON_CreateArray();
     for (int i = 0; i < PM_PRESET_SLOTS; ++i) {
@@ -779,8 +946,97 @@ static esp_err_t h_post_factory_reset(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t h_post_auth(httpd_req_t *req)
+{
+    cJSON *j = read_body_json(req);
+    if (!j) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad json");
+        return ESP_FAIL;
+    }
+    cJSON *p = cJSON_GetObjectItem(j, "pass");
+    const char *pass = (p && cJSON_IsString(p) && p->valuestring) ? p->valuestring : "";
+    const char *expect = stored_ui_password();
+    bool ok = web_auth_enabled() && expect[0] && strcmp(pass, expect) == 0;
+    cJSON_Delete(j);
+    if (!ok) {
+        httpd_resp_set_status(req, "401 Unauthorized");
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"bad password\"}");
+    }
+    mint_session(s_session, sizeof(s_session));
+    char cookie[96];
+    snprintf(cookie, sizeof(cookie), "pm_sess=%s; Path=/; Max-Age=86400; SameSite=Lax", s_session);
+    httpd_resp_set_hdr(req, "Set-Cookie", cookie);
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "ok", true);
+    cJSON_AddStringToObject(o, "token", s_session);
+    return send_json(req, o);
+}
+
+static esp_err_t h_get_auth(httpd_req_t *req)
+{
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "required", web_auth_enabled());
+    cJSON_AddBoolToObject(o, "ok", session_ok(req) || !web_auth_enabled());
+    return send_json(req, o);
+}
+
+static esp_err_t h_post_auth_logout(httpd_req_t *req)
+{
+    s_session[0] = '\0';
+    httpd_resp_set_hdr(req, "Set-Cookie", "pm_sess=; Path=/; Max-Age=0");
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
+}
+
+static esp_err_t h_get_wifi_status(httpd_req_t *req)
+{
+    if (!auth_ok(req, false)) return reject_pin(req);
+    pm_wifi_status_t st;
+    pm_wifi_get_status(&st);
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddStringToObject(o, "mode", st.mode ? st.mode : "?");
+    cJSON_AddBoolToObject(o, "sta", st.sta_connected);
+    cJSON_AddBoolToObject(o, "staConnecting", st.sta_connecting);
+    cJSON_AddBoolToObject(o, "ap", st.ap_active);
+    cJSON_AddBoolToObject(o, "apen", st.ap_enable);
+    cJSON_AddBoolToObject(o, "apfb", st.ap_fallback);
+    cJSON_AddStringToObject(o, "staIp", st.sta_ip);
+    cJSON_AddStringToObject(o, "apIp", st.ap_ip);
+    cJSON_AddStringToObject(o, "staSsid", st.sta_ssid);
+    cJSON_AddStringToObject(o, "apSsid", st.ap_ssid);
+    cJSON_AddStringToObject(o, "host", st.hostname);
+    cJSON_AddStringToObject(o, "otaPart", pm_ota_running_label());
+    return send_json(req, o);
+}
+
+static esp_err_t h_get_wifi_scan(httpd_req_t *req)
+{
+    if (!auth_ok(req, false)) return reject_pin(req);
+    pm_wifi_scan_ap_t aps[24];
+    size_t n = 0;
+    esp_err_t err = pm_wifi_scan(aps, sizeof(aps) / sizeof(aps[0]), &n);
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "ok", err == ESP_OK);
+    if (err != ESP_OK) {
+        cJSON_AddStringToObject(o, "error", esp_err_to_name(err));
+        return send_json(req, o);
+    }
+    cJSON *arr = cJSON_CreateArray();
+    for (size_t i = 0; i < n; ++i) {
+        cJSON *a = cJSON_CreateObject();
+        cJSON_AddStringToObject(a, "ssid", aps[i].ssid);
+        cJSON_AddNumberToObject(a, "rssi", aps[i].rssi);
+        cJSON_AddBoolToObject(a, "open", aps[i].open);
+        cJSON_AddItemToArray(arr, a);
+    }
+    cJSON_AddItemToObject(o, "aps", arr);
+    return send_json(req, o);
+}
+
 static esp_err_t h_get_audio(httpd_req_t *req)
 {
+    if (!auth_ok(req, false)) return reject_pin(req);
     pm_audio_levels_t lv;
     pm_audio_get_levels(&lv);
     cJSON *o = cJSON_CreateObject();
@@ -804,14 +1060,19 @@ esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
     if (!hooks || !hooks->cfg || !hooks->map) return ESP_ERR_INVALID_ARG;
     s_hooks = *hooks;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 28;
-    config.stack_size = 8192;
+    config.max_uri_handlers = 36;
+    config.stack_size = 10240;
     ESP_RETURN_ON_ERROR(httpd_start(&s_server, &config), TAG, "httpd");
 
     const httpd_uri_t routes[] = {
         {.uri = "/", .method = HTTP_GET, .handler = h_index},
         {.uri = "/vendor/bootstrap.min.css", .method = HTTP_GET, .handler = h_bootstrap_css},
         {.uri = "/vendor/bootstrap.bundle.min.js", .method = HTTP_GET, .handler = h_bootstrap_js},
+        {.uri = "/api/auth", .method = HTTP_GET, .handler = h_get_auth},
+        {.uri = "/api/auth", .method = HTTP_POST, .handler = h_post_auth},
+        {.uri = "/api/auth/logout", .method = HTTP_POST, .handler = h_post_auth_logout},
+        {.uri = "/api/wifi/status", .method = HTTP_GET, .handler = h_get_wifi_status},
+        {.uri = "/api/wifi/scan", .method = HTTP_GET, .handler = h_get_wifi_scan},
         {.uri = "/api/config", .method = HTTP_GET, .handler = h_get_config},
         {.uri = "/api/config", .method = HTTP_POST, .handler = h_post_config},
         {.uri = "/api/map", .method = HTTP_GET, .handler = h_get_map},

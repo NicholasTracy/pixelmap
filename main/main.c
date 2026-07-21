@@ -198,7 +198,10 @@ static void apply_wifi_from_cfg(void)
         .sta_ssid = s_cfg.sta_ssid,
         .sta_pass = s_cfg.sta_pass,
         .hostname = s_cfg.hostname,
+        .ap_enable = s_cfg.ap_enable,
         .ap_fallback = s_cfg.ap_fallback,
+        .ap_ssid = s_cfg.ap_ssid,
+        .ap_pass = s_cfg.ap_pass,
     };
     esp_err_t err = pm_wifi_apply(&wifi);
     if (err != ESP_OK) {
@@ -524,7 +527,10 @@ void app_main(void)
         .sta_ssid = s_cfg.sta_ssid,
         .sta_pass = s_cfg.sta_pass,
         .hostname = s_cfg.hostname,
+        .ap_enable = s_cfg.ap_enable,
         .ap_fallback = s_cfg.ap_fallback,
+        .ap_ssid = s_cfg.ap_ssid,
+        .ap_pass = s_cfg.ap_pass,
     };
     ESP_ERROR_CHECK(pm_wifi_start(&wifi));
     pm_wifi_mdns_start(s_cfg.hostname);

@@ -103,7 +103,12 @@ void pm_config_set_defaults(pm_app_config_t *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
     strncpy(cfg->hostname, "pixelmap", sizeof(cfg->hostname) - 1);
+    cfg->ap_enable = false;
     cfg->ap_fallback = true;
+    cfg->ap_ssid[0] = '\0';
+    strncpy(cfg->ap_pass, "pixelmap1", sizeof(cfg->ap_pass) - 1);
+    cfg->web_auth = false;
+    cfg->web_pass[0] = '\0';
     cfg->gpio_data = pm_config_default_strip_gpio(0);
     cfg->gpio_clock = 14;
     cfg->gpio_status_led = 2; /* ESP32 DevKit / common WLED onboard LED */
@@ -362,14 +367,22 @@ esp_err_t pm_config_load(pm_app_config_t *cfg)
     if (err == ESP_ERR_NVS_NOT_FOUND) return ESP_OK;
     if (err != ESP_OK) return err;
 
+    int32_t v = 0;
     size_t len = sizeof(cfg->sta_ssid);
     nvs_get_str(h, "ssid", cfg->sta_ssid, &len);
     len = sizeof(cfg->sta_pass);
     nvs_get_str(h, "pass", cfg->sta_pass, &len);
     len = sizeof(cfg->hostname);
     nvs_get_str(h, "host", cfg->hostname, &len);
-
-    int32_t v;
+    if (nvs_get_i32(h, "apen", &v) == ESP_OK) cfg->ap_enable = v != 0;
+    if (nvs_get_i32(h, "apfb", &v) == ESP_OK) cfg->ap_fallback = v != 0;
+    len = sizeof(cfg->ap_ssid);
+    nvs_get_str(h, "apssid", cfg->ap_ssid, &len);
+    len = sizeof(cfg->ap_pass);
+    nvs_get_str(h, "appass", cfg->ap_pass, &len);
+    if (nvs_get_i32(h, "webauth", &v) == ESP_OK) cfg->web_auth = v != 0;
+    len = sizeof(cfg->web_pass);
+    nvs_get_str(h, "webpass", cfg->web_pass, &len);
     if (nvs_get_i32(h, "gpio", &v) == ESP_OK) cfg->gpio_data = v;
     if (nvs_get_i32(h, "clk", &v) == ESP_OK) cfg->gpio_clock = v;
     if (nvs_get_i32(h, "sled", &v) == ESP_OK) cfg->gpio_status_led = v;
@@ -508,6 +521,11 @@ esp_err_t pm_config_load(pm_app_config_t *cfg)
     if (nvs_get_i32(h, "povpath", &v) == ESP_OK) cfg->pov_path_length_m = (float)v / 1000.0f;
 
     nvs_close(h);
+    /* Migrate legacy short UI PIN into web_pass when unset. */
+    if (!cfg->web_pass[0] && cfg->ui_pin[0]) {
+        strncpy(cfg->web_pass, cfg->ui_pin, sizeof(cfg->web_pass) - 1);
+        cfg->web_pass[sizeof(cfg->web_pass) - 1] = '\0';
+    }
     coerce_unsupported_chipset(cfg);
     pm_config_sync_strips(cfg);
     return ESP_OK;
@@ -528,6 +546,12 @@ esp_err_t pm_config_save(const pm_app_config_t *cfg)
     nvs_set_str(h, "ssid", cfg->sta_ssid);
     nvs_set_str(h, "pass", cfg->sta_pass);
     nvs_set_str(h, "host", cfg->hostname);
+    nvs_set_i32(h, "apen", cfg->ap_enable ? 1 : 0);
+    nvs_set_i32(h, "apfb", cfg->ap_fallback ? 1 : 0);
+    nvs_set_str(h, "apssid", cfg->ap_ssid);
+    nvs_set_str(h, "appass", cfg->ap_pass);
+    nvs_set_i32(h, "webauth", cfg->web_auth ? 1 : 0);
+    nvs_set_str(h, "webpass", cfg->web_pass);
     nvs_set_i32(h, "gpio", cfg->gpio_data);
     nvs_set_i32(h, "clk", cfg->gpio_clock);
     nvs_set_i32(h, "sled", cfg->gpio_status_led);

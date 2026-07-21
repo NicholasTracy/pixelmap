@@ -51,20 +51,34 @@ Optional I2S MEMS mic (`components/audio`, INMP441-style: WS / BCLK / DOUT). A l
 
 `config_store` writes WiFi, strip, effect, and universe settings to NVS. Pixel map point clouds (including wire order) persist to the `storage` data partition (raw JSON blob via `map_store`) whenever `/api/map` or `/api/map/grid` changes the map. On boot, the blob is loaded if present; otherwise the map is regenerated from layout parameters in NVS.
 
+## Wi‑Fi (`wifi_mgr`)
+
+- **STA** — join a home/venue network (SSID/password from NVS).
+- **SoftAP** — `PixelMap-XXXX` (or custom SSID), default password `pixelmap1` (changeable; min 8 chars). UI at `http://192.168.4.1/`.
+- **APSTA** — SoftAP always on (`apen`) while also on STA, or **AP fallback** (`apfb`, default on) when STA drops.
+- **Scan** — blocking `pm_wifi_scan` via `GET /api/wifi/scan` (forces APSTA briefly if AP-only).
+- **mDNS** — `hostname.local` HTTP service.
+
 ## Web UI
 
-Embedded single-page app (`components/web_ui/index.html`) served by `esp_http_server`:
+Embedded single-page app (`components/web_ui/index.html`) served by `esp_http_server`.
+
+Opt-in **secure web UI** (`webAuth` + `webpass`): login page + session cookie `pm_sess` / header `X-PixelMap-Auth`. Gates all API routes except `/api/auth*`. OTA uses the same gate. Legacy short `ui_pin` migrates into `web_pass` if unset.
 
 | Route | Purpose |
 |-------|---------|
-| `GET /` | Editor UI |
+| `GET /` | Editor UI (login HTML if auth required) |
 | `GET /vendor/bootstrap.min.css` | Bootstrap CSS (embedded) |
 | `GET /vendor/bootstrap.bundle.min.js` | Bootstrap JS (embedded) |
-| `GET/POST /api/config` | Device + strip + protocol settings (`pass` never returned on GET; optional `X-PixelMap-Pin`) |
+| `GET/POST /api/auth` | Auth status / login (`token` + Set-Cookie) |
+| `POST /api/auth/logout` | Clear session |
+| `GET /api/wifi/status` | STA/AP mode, IPs, SSIDs |
+| `GET /api/wifi/scan` | Nearby SSIDs (RSSI) |
+| `GET/POST /api/config` | Device + strip + Wi‑Fi/AP/auth settings (`pass` never returned on GET) |
 | `GET/POST /api/map` | Spatial map JSON (persisted via `map_store`) |
 | `POST /api/map/grid` | Generate normalized lattice / shape |
 | `GET/POST /api/fx/lua` | Custom Lua effect script |
-| `GET/POST /api/ota` | Firmware OTA (raw `.bin` body on POST) |
+| `GET/POST /api/ota` | Firmware OTA (raw app `.bin` body on POST; works over SoftAP or STA) |
 | `GET/POST /api/presets` | Effect preset slots |
 | `POST /api/factory_reset` | Erase NVS + map storage, reboot |
 | `GET /api/audio` | Live mic levels (volume / bands / spectrum / beat) |
