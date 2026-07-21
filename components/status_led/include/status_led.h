@@ -24,8 +24,8 @@ typedef enum {
 typedef struct {
     int gpio;                 /* <0 disables */
     bool active_high;         /* ESP32 DevKit onboard LED is active-high */
-    int avoid_gpio_a;         /* skip if status pin equals these (data/clock) */
-    int avoid_gpio_b;
+    const int *avoid_gpios;   /* data pins (and clock) that must not collide */
+    uint8_t avoid_count;
 } pm_status_led_config_t;
 
 esp_err_t pm_status_led_init(const pm_status_led_config_t *cfg);

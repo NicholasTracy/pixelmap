@@ -4,223 +4,4223 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>PixelMap</title>
+<link rel="stylesheet" href="/vendor/bootstrap.min.css"/>
 <style>
 :root{
   --bg:#0e1210; --panel:#171d1a; --ink:#e8f0ea; --muted:#8aa093;
   --accent:#3dffa8; --line:#2a3530; --warn:#ffb454;
   --font-display:"Segoe UI",system-ui,sans-serif;
+  --bs-body-bg:var(--bg);
+  --bs-body-color:var(--ink);
+  --bs-border-color:var(--line);
+  --bs-secondary-color:var(--muted);
+  --bs-border-radius:0;
+  --bs-border-radius-sm:0;
+  --bs-border-radius-lg:0;
+  --bs-border-radius-pill:0;
 }
-*{box-sizing:border-box}
-body{margin:0;background:radial-gradient(1200px 600px at 10% -10%,#1a2a22,transparent),
-  radial-gradient(900px 500px at 100% 0%,#1a2230,transparent),var(--bg);
-  color:var(--ink);font:15px/1.45 var(--font-display)}
-header{padding:1.25rem 1.5rem;border-bottom:1px solid var(--line);display:flex;gap:1rem;align-items:baseline;flex-wrap:wrap}
-header h1{margin:0;font-size:1.6rem;letter-spacing:.04em;color:var(--accent)}
-header p{margin:0;color:var(--muted)}
-main{display:grid;grid-template-columns:1.1fr 1fr;gap:1rem;padding:1rem 1.5rem 2rem}
-@media(max-width:900px){main{grid-template-columns:1fr}}
-section{background:rgba(23,29,26,.9);border:1px solid var(--line);padding:1rem 1.1rem}
-section h2{margin:0 0 .75rem;font-size:.95rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
-label{display:block;margin:.55rem 0 .2rem;color:var(--muted);font-size:.85rem}
-input,select,button,textarea{width:100%;padding:.55rem .65rem;border:1px solid var(--line);
-  background:#0f1512;color:var(--ink);border-radius:0}
-button{cursor:pointer;background:linear-gradient(180deg,#244036,#1a2c26);border-color:#35584a;margin-top:.75rem}
-button.primary{background:linear-gradient(180deg,#2d6b52,#1f4a39);border-color:var(--accent);color:#d9ffe0}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-#mapCanvas{width:100%;height:320px;background:#0a0e0c;border:1px solid var(--line);touch-action:none}
-.status{font-size:.85rem;color:var(--muted);margin-top:.5rem}
-.ok{color:var(--accent)}
+body{
+  margin:0;min-height:100vh;
+  background:
+    radial-gradient(1200px 600px at 10% -10%,#1a2a22,transparent),
+    radial-gradient(900px 500px at 100% 0%,#1a2230,transparent),
+    var(--bg);
+  color:var(--ink);font-family:var(--font-display);
+}
+.pm-header{padding:1.25rem 0;border-bottom:1px solid var(--line)}
+.pm-header h1{margin:0;font-size:1.6rem;letter-spacing:.04em;color:var(--accent)}
+.pm-header p{margin:0;color:var(--muted)}
+.pm-panel{background:rgba(23,29,26,.9);border:1px solid var(--line);padding:1.1rem 1.15rem 1.25rem}
+.pm-section-title{margin:0 0 .85rem;font-size:.95rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.nav-tabs{border-bottom:1px solid var(--line);flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.nav-tabs .nav-link{color:var(--muted);border:0;border-bottom:2px solid transparent;border-radius:0;white-space:nowrap;padding:.7rem .9rem;background:transparent}
+.nav-tabs .nav-link:hover{color:var(--ink)}
+.nav-tabs .nav-link.active{color:var(--accent);background:transparent;border-color:transparent transparent var(--accent)}
+.form-label{color:var(--muted);font-size:.85rem;margin-bottom:.25rem}
+.form-control,.form-select{background:#0f1512;border:1px solid var(--line);color:var(--ink);border-radius:0}
+.form-control:focus,.form-select:focus{background:#0f1512;color:var(--ink);border-color:var(--accent);box-shadow:0 0 0 .15rem rgba(61,255,168,.15)}
+.form-range{accent-color:var(--accent)}
+.form-check-input{background-color:#0f1512;border-color:var(--line);border-radius:0}
+.form-check-input:checked{background-color:#2d6b52;border-color:var(--accent)}
+.form-check-label{color:var(--ink)}
+.btn{border-radius:0;margin-top:.35rem}
+.btn-pm{background:linear-gradient(180deg,#244036,#1a2c26);border:1px solid #35584a;color:var(--ink)}
+.btn-pm:hover{background:linear-gradient(180deg,#2a4a3e,#1f342c);color:var(--ink);border-color:#45705e}
+.btn-pm-primary{background:linear-gradient(180deg,#2d6b52,#1f4a39);border:1px solid var(--accent);color:#d9ffe0}
+.btn-pm-primary:hover{background:linear-gradient(180deg,#34825f,#255a45);border-color:var(--accent);color:#fff}
+.pm-help{font-size:.85rem;color:var(--muted);margin-top:.35rem}
+.pm-help.err{color:var(--warn)}
+.pm-status{font-size:.85rem;color:var(--muted);margin-top:.55rem;min-height:1.2em}
+.pm-status.ok{color:var(--accent)}
+.pm-status.err{color:var(--warn)}
+.gated-disabled{opacity:.4;pointer-events:none;filter:grayscale(.35)}
+#mapCanvas,#povCanvas,#fxCanvas{width:100%;background:#0a0e0c;border:1px solid var(--line);display:block;touch-action:none}
+#mapFormula,#fxLua{background:#0f1512;border:1px solid var(--line);color:var(--ink);border-radius:0;font-size:.85rem;line-height:1.45}
+#mapCanvas{height:min(52vh,480px)}
+#mapCanvas.is-3d{height:min(58vh,520px);cursor:grab}
+#mapCanvas.is-3d:active{cursor:grabbing}
+#povCanvas{height:min(42vh,340px)}
+#fxCanvas{cursor:default}
+#fxCanvas.is-3d{cursor:grab}
+#fxCanvas.is-3d:active{cursor:grabbing}
+#mapCanvas.wire-mode{cursor:crosshair}
+#mapCanvas.wire-mode.is-3d{cursor:crosshair}
+.pm-warn-box{border:1px solid var(--warn);color:var(--warn);background:rgba(255,180,84,.08);padding:.55rem .75rem;font-size:.85rem;margin-top:.5rem}
+.pm-warn-box[hidden]{display:none!important}
+.strip-bus-row{border:1px solid var(--line);padding:.65rem .75rem;background:rgba(10,14,12,.45)}
+.strip-bus-row .form-label{margin-bottom:.2rem}
+.strip-gpio-custom{max-width:6.5rem}
+.fx-workspace,.map-workspace{margin-top:1rem}
+.fx-sliders,.map-options,.fx-preview,.map-preview{min-width:0}
+.map-options .form-label{margin-bottom:.2rem}
+.map-options .form-select,.map-options .form-control{font-size:.9rem}
+.map-dim-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.map-dim-row > .d-none{display:none!important}
+.map-preview-tools{display:flex;flex-wrap:wrap;gap:.75rem 1rem;align-items:center;margin-top:.55rem}
+.map-wire-row{border:1px solid var(--line);padding:.75rem .85rem;background:rgba(10,14,12,.35)}
+.map-wire-row[hidden]{display:none!important}
+.fx-param-row{display:grid;grid-template-columns:4.6rem minmax(0,1fr) 2rem 1.35rem;gap:.15rem .35rem;align-items:center;margin-bottom:.28rem}
+.fx-param-row label{margin:0;font-size:.75rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fx-param-row .fx-param-val{font-size:.72rem;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+.fx-param-row input[type=range]{width:100%;height:1.1rem;margin:0}
+.fx-param-row .fx-dmx-fixed{font-size:.68rem;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.fx-param-row.is-locked{opacity:.45;filter:grayscale(.35)}
+.fx-param-row.is-locked input[type=range]{pointer-events:none;cursor:not-allowed}
+.fx-param-row.is-locked .fx-param-val{color:var(--muted)}
+.ctl-channel{border:1px solid var(--line);padding:.55rem .7rem;margin-bottom:.45rem;background:rgba(10,14,12,.4)}
+.ctl-channel.is-idle{opacity:.55}
+.ctl-channel-top{display:flex;flex-wrap:wrap;gap:.35rem .75rem;align-items:baseline;margin-bottom:.35rem}
+.ctl-ch{font-size:.72rem;color:var(--accent);font-variant-numeric:tabular-nums;min-width:2.2rem}
+.ctl-label{font-size:.86rem;color:var(--ink);font-weight:600}
+.ctl-fxrole{font-size:.72rem;color:var(--muted)}
+.ctl-live{display:grid;grid-template-columns:minmax(0,1fr) 2.4rem;gap:.4rem;align-items:center;margin-bottom:.35rem}
+.ctl-meter{height:.55rem;background:#0a0e0c;border:1px solid var(--line);position:relative;overflow:hidden}
+.ctl-meter > i{display:block;height:100%;width:0;background:linear-gradient(90deg,#1a6b4a,var(--accent));transition:width 40ms linear}
+.ctl-live-val{font-size:.72rem;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.ctl-base-row{display:grid;grid-template-columns:2.4rem minmax(0,1fr) 2.2rem;gap:.35rem;align-items:center;margin-bottom:.35rem}
+.ctl-base-row label{margin:0;font-size:.7rem;color:var(--muted)}
+.ctl-base-row input[type=range]{width:100%;height:1.05rem;margin:0}
+.ctl-base-row .ctl-base-val{font-size:.7rem;text-align:right;font-variant-numeric:tabular-nums}
+.ctl-mod-row{display:grid;grid-template-columns:minmax(5.5rem,1fr) repeat(3,minmax(0,1fr));gap:.35rem;align-items:end}
+.ctl-mod-row .form-label{margin:0 0 .1rem;font-size:.65rem;color:var(--muted)}
+.ctl-mod-row .form-select,.ctl-mod-row .form-control{font-size:.75rem;padding:.2rem .35rem}
+.ctl-mod-row.is-off .ctl-mod-knob{opacity:.35;pointer-events:none}
+.ctl-mod-row[hidden]{display:none!important}
+.fx-preview-tools{display:flex;flex-wrap:wrap;gap:.75rem 1rem;align-items:center;margin-top:.55rem}
+#fxCanvas{height:min(48vh,420px)}
+#fxCanvas.is-3d{height:min(52vh,460px)}
+.tab-pane{padding-top:1rem}
+@media (max-width:575.98px){
+  .pm-header h1{font-size:1.35rem}
+  .nav-tabs .nav-link{padding:.65rem .7rem;font-size:.9rem}
+  .ctl-mod-row{grid-template-columns:1fr 1fr;gap:.4rem}
+}
+@media (min-width:576px) and (max-width:991.98px){
+  .ctl-mod-row{grid-template-columns:minmax(5.5rem,1.2fr) repeat(3,minmax(0,1fr))}
+}
 </style>
 </head>
 <body>
-<header>
-  <h1>PixelMap</h1>
-  <p>Spatial LED control · WiFi · Art-Net · sACN</p>
-</header>
-<main>
-  <section>
-    <h2>Device &amp; Strip</h2>
-    <div class="row">
-      <div><label>WiFi SSID</label><input id="ssid"/></div>
-      <div><label>WiFi Password</label><input id="pass" type="password"/></div>
-    </div>
-    <div class="row">
-      <div><label>Hostname</label><input id="host"/></div>
-      <div><label>Data GPIO</label><input id="gpio" type="number"/></div>
-    </div>
-    <div class="row">
-      <div><label>Status LED GPIO (−1 = off)</label><input id="sled" type="number"/></div>
-      <div><label><input id="sledh" type="checkbox"/> Status LED active-high</label>
-        <p class="status">Default GPIO 2 = onboard LED on most WLED ESP32 boards</p>
+<div class="container-fluid px-3 px-md-4 pb-4">
+  <header class="pm-header d-flex flex-wrap gap-2 gap-md-3 align-items-baseline">
+    <h1>PixelMap</h1>
+    <p>Spatial LED control · WiFi · Art-Net · sACN</p>
+  </header>
+
+  <ul class="nav nav-tabs mt-3" id="pmTabs" role="tablist">
+    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-network" type="button">Network</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-strip" type="button">Strip</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-effects" data-bs-toggle="tab" data-bs-target="#pane-effects" type="button">Effects</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-pov" data-bs-toggle="tab" data-bs-target="#pane-pov" type="button">POV</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-control" data-bs-toggle="tab" data-bs-target="#pane-control" type="button">Control</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-map" data-bs-toggle="tab" data-bs-target="#pane-map" type="button">Map</button></li>
+  </ul>
+
+  <div class="tab-content">
+    <div class="tab-pane fade show active" id="pane-network">
+      <div class="pm-panel">
+        <h2 class="pm-section-title">Wi‑Fi &amp; device</h2>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="ssid">WiFi SSID</label><input class="form-control" id="ssid"/></div>
+          <div class="col-md-6"><label class="form-label" for="pass">WiFi Password</label><input class="form-control" id="pass" type="password"/></div>
+          <div class="col-md-6"><label class="form-label" for="host">Hostname</label><input class="form-control" id="host"/></div>
+        </div>
+        <button class="btn btn-pm-primary mt-3" type="button" id="saveNetwork">Save network settings</button>
+        <div class="pm-status" id="statusNetwork"></div>
       </div>
     </div>
-    <div class="row">
-      <div><label>Chipset</label>
-        <select id="chip">
-          <option>WS2812B</option><option>WS2812</option><option>WS2811</option>
-          <option>WS2813</option><option>SK6812_RGBW</option><option>TM1814</option>
-          <option>APA102</option><option>SK9822</option>
-        </select>
-      </div>
-      <div><label>Pixels</label><input id="count" type="number" min="1" max="4096"/></div>
-    </div>
-    <div class="row">
-      <div><label>Brightness</label><input id="bri" type="range" min="1" max="255"/></div>
-      <div><label>Gamma (x100)</label><input id="gamma" type="number" min="100" max="300"/></div>
-    </div>
-    <div class="row">
-      <div><label>Effect</label>
-        <select id="fx">
-          <option value="0">Solid</option>
-          <option value="1">Rainbow Spatial</option>
-          <option value="2">Plasma</option>
-          <option value="3">Noise Field</option>
-          <option value="4">Radial Wave</option>
-          <option value="5">Plane Sweep</option>
-          <option value="6">POV Image Plane</option>
-        </select>
-      </div>
-      <div><label>Effect Speed</label><input id="speed" type="number" step="0.1" min="0" max="10"/></div>
-    </div>
-    <h2 style="margin-top:1.1rem">Persistence of Vision (POV)</h2>
-    <p class="status">For a spinning fan blade or a waved wand. Set RPM / speed to match the real motion so patterns paint correctly in mid-air.</p>
-    <div class="row">
-      <label><input id="pove" type="checkbox"/> Enable POV mapping</label>
-      <div><label>Motion mode</label>
-        <select id="povm">
-          <option value="1">Rotation (fan / propeller)</option>
-          <option value="2">Linear (wand sweep)</option>
-        </select>
+
+    <div class="tab-pane fade" id="pane-strip">
+      <div class="pm-panel">
+        <h2 class="pm-section-title">LED strip &amp; hardware</h2>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="scnt">Connected strips</label>
+            <input class="form-control" id="scnt" type="number" min="1" max="8" step="1" value="1"/>
+          </div>
+          <div class="col-md-6"><label class="form-label" for="chip">Chipset</label>
+            <select class="form-select" id="chip">
+              <option>WS2812B</option><option>WS2812</option><option>WS2811</option>
+              <option>WS2813</option><option>SK6812_RGBW</option><option>TM1814</option>
+              <option>APA102</option><option>SK9822</option>
+            </select>
+          </div>
+          <div class="col-12" id="stripBusGate">
+            <label class="form-label">Strip outputs</label>
+            <div class="d-flex flex-column gap-2" id="stripBusFields"></div>
+            <p class="pm-help mt-2 mb-0">Total LEDs: <strong id="countTotal">60</strong>
+              <input type="hidden" id="count" value="60"/>
+              <input type="hidden" id="gpio" value="16"/>
+            </p>
+            <div class="pm-warn-box" id="stripBudgetWarn" hidden></div>
+            <div class="pm-warn-box" id="stripGpioWarn" hidden></div>
+          </div>
+          <div class="col-md-6"><label class="form-label" for="gamma">Gamma (×100)</label><input class="form-control" id="gamma" type="number" min="100" max="300"/></div>
+          <div class="col-12"><label class="form-label" for="bri">Brightness <span id="briVal"></span></label><input class="form-range" id="bri" type="range" min="1" max="255"/></div>
+          <div class="col-md-6"><label class="form-label" for="sled">Status LED GPIO (−1 = off)</label><input class="form-control" id="sled" type="number"/></div>
+          <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="sledh"/><label class="form-check-label" for="sledh">Status LED active-high</label>
+          </div></div>
+        </div>
+        <button class="btn btn-pm-primary mt-3" type="button" id="saveStrip">Save strip settings</button>
+        <div class="pm-status" id="statusStrip"></div>
       </div>
     </div>
-    <div class="row">
-      <div><label>Strip layout</label>
-        <select id="poyl">
-          <option value="0">Radius (hub → tip)</option>
-          <option value="1">Diameter (tip → tip)</option>
-        </select>
+
+    <div class="tab-pane fade" id="pane-effects">
+      <div class="pm-panel">
+        <h2 class="pm-section-title">Built-in effects</h2>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="fx">Effect</label>
+            <select class="form-select" id="fx">
+              <optgroup label="Classic">
+                <option value="0">Solid</option>
+                <option value="1">Rainbow Spatial</option>
+                <option value="2">Plasma</option>
+                <option value="3">Noise Field</option>
+                <option value="4">Radial Wave</option>
+                <option value="5">Plane Sweep</option>
+                <option value="6">POV Image Plane</option>
+              </optgroup>
+              <optgroup label="Geometric">
+                <option value="7">Checkerboard</option>
+                <option value="8">Stripes</option>
+                <option value="9">Cartesian Grid</option>
+                <option value="10">Box Rings</option>
+                <option value="11">Sphere Rings</option>
+                <option value="12">Crosshair</option>
+                <option value="13">Diamond Lattice</option>
+                <option value="14">Spiral</option>
+                <option value="15">Starburst</option>
+                <option value="16">Chevron</option>
+                <option value="17">Helix</option>
+                <option value="18">Axis Planes</option>
+                <option value="19">Scan Volume</option>
+                <option value="20">Interference</option>
+                <option value="21">Triangle Lattice</option>
+                <option value="22">Cubic Pulse</option>
+                <option value="23">Polar Grid</option>
+                <option value="24">Wave Walls</option>
+                <option value="25">Custom Lua</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+        <input type="hidden" id="speed" value="1"/>
+        <div class="row g-3 fx-workspace">
+          <div class="col-md-4 col-lg-3 fx-sliders" id="fxParams">
+            <div id="fxParamRows"></div>
+          </div>
+          <div class="col-md-8 col-lg-9 fx-preview">
+            <p class="pm-help mt-0 mb-1" id="fxPreviewHint"></p>
+            <canvas id="fxCanvas" width="720" height="400"></canvas>
+            <div class="fx-preview-tools" id="fxOrbitTools">
+              <div class="form-check m-0">
+                <input class="form-check-input" type="checkbox" id="fx3dAuto" checked/>
+                <label class="form-check-label" for="fx3dAuto">Spin view</label>
+              </div>
+              <button class="btn btn-pm" type="button" id="fx3dReset">Reset view</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-pm-primary mt-3" type="button" id="saveEffects">Save effect settings</button>
+        <div class="pm-status" id="statusEffects"></div>
+
+        <div id="fxLuaPanel" hidden>
+          <hr class="my-4" style="border-color:var(--line)"/>
+          <h2 class="pm-section-title">Custom effect (Lua)</h2>
+          <label class="form-label" for="fxLua">Effect script</label>
+          <textarea class="form-control font-monospace" id="fxLua" rows="12" spellcheck="false">-- t,speed,scale,intensity,i,count,x,y,z
+-- ph,ps,pv / sh,ss,sv / p1..p8 / pos xyz / rot xyz (DMX ch 1–23)
+-- return hsv(h,s,v) or rgb(r,g,b)
+
+local d = length(x - 0.5, y - 0.5, z - 0.5)
+local wave = 0.5 + 0.5 * sin(d * (8 + p1 * 24) - t * (2 + speed))
+return hsv((ph + t * 40 + d * 80 * p2) % 256, ps, wave * pv * intensity)</textarea>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button class="btn btn-pm-primary" type="button" id="fxLuaSaveDevice">Save to device</button>
+            <button class="btn btn-pm" type="button" id="fxLuaLoadDevice">Load from device</button>
+            <button class="btn btn-pm" type="button" id="fxLuaSave">Save locally</button>
+            <button class="btn btn-pm" type="button" id="fxLuaReset">Reset example</button>
+          </div>
+          <div class="pm-status" id="fxLuaStatus"></div>
+        </div>
       </div>
-      <div><label>RPM (rotation)</label><input id="povrpm" type="number" step="1" min="0" max="10000"/></div>
     </div>
-    <div class="row">
-      <div><label>Linear speed (m/s)</label><input id="povspd" type="number" step="0.1" min="0" max="50"/></div>
-      <div><label>Radius / half-span (m)</label><input id="povrad" type="number" step="0.01" min="0.01" max="5"/></div>
+
+    <div class="tab-pane fade" id="pane-pov">
+      <div class="pm-panel">
+        <h2 class="pm-section-title">Persistence of vision</h2>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="pove"/>
+          <label class="form-check-label" for="pove">Enable POV mapping</label>
+        </div>
+        <p class="pm-help mb-3" id="povOffHint" hidden></p>
+
+        <div id="povSettingsGate">
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label" for="povm">Motion mode</label>
+              <select class="form-select" id="povm">
+                <option value="1">Rotation (fan / propeller)</option>
+                <option value="2">Linear (wand sweep)</option>
+              </select>
+            </div>
+            <div class="col-md-6 gate-rot"><label class="form-label" for="povbl">Blade / strip count (1–10)</label>
+              <input class="form-control" id="povbl" type="number" min="1" max="10" step="1"/>
+            </div>
+            <div class="col-md-6"><label class="form-label" for="poyl">Strip layout</label>
+              <select class="form-select" id="poyl">
+                <option value="0">Radius (hub → tip)</option>
+                <option value="1">Diameter (tip → tip)</option>
+              </select>
+            </div>
+            <div class="col-md-6 gate-rot"><label class="form-label" for="povrpm">RPM</label>
+              <input class="form-control" id="povrpm" type="number" step="1" min="0" max="10000"/>
+            </div>
+            <div class="col-md-6 gate-lin"><label class="form-label" for="povspd">Linear speed (m/s)</label>
+              <input class="form-control" id="povspd" type="number" step="0.1" min="0" max="50"/>
+            </div>
+            <div class="col-md-6"><label class="form-label" for="povrad">Radius / half-span (m)</label>
+              <input class="form-control" id="povrad" type="number" step="0.1" min="0.1" max="5"/>
+            </div>
+            <div class="col-md-6 gate-lin"><label class="form-label" for="povpath">Wand path length (m)</label>
+              <input class="form-control" id="povpath" type="number" step="0.1" min="0.1" max="10"/>
+            </div>
+          </div>
+          <p class="pm-help mt-2" id="povBladeHint" hidden></p>
+          <canvas id="povCanvas" width="640" height="360"></canvas>
+          <button class="btn btn-pm-primary mt-3" type="button" id="savePov">Save POV settings</button>
+          <div class="pm-status" id="statusPov"></div>
+        </div>
+      </div>
     </div>
-    <div class="row">
-      <div><label>Wand path length (m)</label><input id="povpath" type="number" step="0.05" min="0.1" max="10"/></div>
-      <div></div>
+
+    <div class="tab-pane fade" id="pane-control">
+      <div class="pm-panel">
+        <h2 class="pm-section-title">Art-Net / sACN</h2>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="aen"/><label class="form-check-label" for="aen">Art-Net</label></div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="sen"/><label class="form-check-label" for="sen">sACN</label></div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="universe">Universe</label>
+            <input class="form-control" id="universe" type="number" min="0" max="63999"/>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="dmxmode">Stream mode</label>
+            <select class="form-select" id="dmxmode">
+              <option value="1">Effect parameters (ch 1–23)</option>
+              <option value="0">Pixel RGB</option>
+            </select>
+          </div>
+        </div>
+        <p class="pm-help mt-2 mb-0">Only one protocol can be on. Universe applies to the enabled protocol.</p>
+      </div>
+      <div class="pm-panel mt-3">
+        <h2 class="pm-section-title">Channel control</h2>
+        <p class="pm-help mt-0" id="ctlChannelHelp">Fixed map · ch 1–23. Live meters follow base + modulator when DMX is off.</p>
+        <div id="ctlChannelRows"></div>
+        <button class="btn btn-pm-primary mt-3" type="button" id="saveControl">Save control settings</button>
+        <div class="pm-status" id="statusControl"></div>
+      </div>
     </div>
-    <div class="row">
-      <div><label>Art-Net Universe</label><input id="aun" type="number"/></div>
-      <div><label>sACN Universe</label><input id="sun" type="number"/></div>
+
+    <div class="tab-pane fade" id="pane-map">
+      <div class="pm-panel">
+        <h2 class="pm-section-title">Pixel map editor</h2>
+        <p class="pm-help mb-3" id="mapPovHint" hidden>POV is on — map positions come from the POV tab.</p>
+
+        <div id="mapNormalGate">
+          <div class="row g-3 map-workspace">
+            <div class="col-md-4 col-lg-3 map-options">
+              <div class="mb-2"><label class="form-label" for="mdim">Dimension</label>
+                <select class="form-select" id="mdim">
+                  <option value="0">2D</option>
+                  <option value="1">3D</option>
+                </select>
+              </div>
+              <div class="mb-2"><label class="form-label" for="mlay">Layout</label>
+                <select class="form-select" id="mlay">
+                  <!-- Options rebuilt by syncLayoutOptions() from Dimension (2D vs 3D) -->
+                  <option value="0">Grid</option>
+                  <option value="1">Circle</option>
+                  <option value="7">Custom formula</option>
+                </select>
+              </div>
+              <div class="mb-2 gate-fill"><label class="form-label" for="mfill" id="mfillLabel">Fill mode</label>
+                <select class="form-select" id="mfill">
+                  <option value="0">Surface / shell</option>
+                  <option value="1">Solid / filled</option>
+                </select>
+              </div>
+              <div class="mb-2"><label class="form-label" for="mspc">Pixel spacing</label>
+                <input class="form-control" id="mspc" type="number" min="0.1" max="100" step="0.1"/>
+              </div>
+              <div class="map-dim-row mb-2 gate-whd">
+                <div><label class="form-label" for="mw" id="mwLabel">Width</label><input class="form-control" id="mw" type="number" min="1" max="128"/></div>
+                <div class="gate-h"><label class="form-label" for="mh" id="mhLabel">Height</label><input class="form-control" id="mh" type="number" min="1" max="128"/></div>
+                <div class="gate-d"><label class="form-label" for="md" id="mdLabel">Depth</label><input class="form-control" id="md" type="number" min="1" max="64"/></div>
+              </div>
+              <div class="mb-2 gate-opentb">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="mopentb"/>
+                  <label class="form-check-label" for="mopentb">Open top &amp; bottom</label>
+                </div>
+              </div>
+              <div class="d-flex flex-wrap gap-2 mb-2">
+                <button class="btn btn-pm" type="button" id="buildGrid">Build map</button>
+                <button class="btn btn-pm-primary" type="button" id="saveMap">Save map</button>
+              </div>
+              <p class="pm-help mb-2" id="mapBudgetHint"></p>
+              <div class="pm-warn-box" id="mapBudgetWarn" hidden></div>
+
+              <div class="gate-formula" id="mapFormulaPanel" hidden>
+                <label class="form-label" for="mapFormula">Map formula</label>
+                <textarea class="form-control font-monospace" id="mapFormula" rows="8" spellcheck="false">const W = 12, H = 10, D = 12, sp = spacing;
+return boxFaces({ w: W, h: H, d: D, spacing: sp, openTopBottom: true });</textarea>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                  <button class="btn btn-pm" type="button" id="mapFormulaApply">Apply</button>
+                  <button class="btn btn-pm" type="button" id="mapFormulaExample">Example</button>
+                </div>
+                <div class="pm-status" id="mapFormulaStatus"></div>
+              </div>
+              <button class="btn btn-pm w-100 mt-2" type="button" id="wireOrderBtn">Edit wire order</button>
+              <div class="pm-status" id="mapStatus"></div>
+            </div>
+
+            <div class="col-md-8 col-lg-9 map-preview">
+              <canvas id="mapCanvas" width="720" height="420"></canvas>
+              <div class="map-preview-tools">
+                <div class="gate-3d" style="min-width:8rem">
+                  <label class="form-label mb-0" for="mapZLayer">Edit Z layer</label>
+                  <input class="form-range" id="mapZLayer" type="range" min="0" max="0" step="1" value="0"/>
+                  <div class="pm-help mt-0" id="mapZLayerLabel">Layer 0</div>
+                </div>
+                <div class="form-check m-0 gate-3d">
+                  <input class="form-check-input" type="checkbox" id="map3dAuto"/>
+                  <label class="form-check-label" for="map3dAuto">Spin view</label>
+                </div>
+                <button class="btn btn-pm gate-3d" type="button" id="map3dReset">Reset view</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="map-wire-row mt-3" id="wireOrderBar" hidden>
+            <div class="row g-2 align-items-end">
+              <div class="col-6 col-md-2 gate-multistrip">
+                <label class="form-label" for="routeStrip">Strip</label>
+                <select class="form-select" id="routeStrip"></select>
+              </div>
+              <div class="col-6 col-md-3">
+                <label class="form-label" for="autoRouteOrder">Auto route</label>
+                <select class="form-select" id="autoRouteOrder">
+                  <option value="xyz">L→R, T→B, F→B</option>
+                  <option value="xzy">L→R, F→B, T→B</option>
+                  <option value="yxz">T→B, L→R, F→B</option>
+                  <option value="yzx">T→B, F→B, L→R</option>
+                  <option value="zxy">F→B, L→R, T→B</option>
+                  <option value="zyx">F→B, T→B, L→R</option>
+                </select>
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label" for="autoRouteRun">Run style</label>
+                <select class="form-select" id="autoRouteRun">
+                  <option value="progressive">Start of run</option>
+                  <option value="zigzag">Zig-zag</option>
+                </select>
+              </div>
+              <div class="col-6 col-md-auto d-flex flex-wrap gap-2">
+                <button class="btn btn-pm" type="button" id="autoRouteApply">Apply auto route</button>
+                <button class="btn btn-pm" type="button" id="wireOrderUndo">Undo</button>
+                <button class="btn btn-pm" type="button" id="wireOrderClear">Clear</button>
+              </div>
+              <div class="col-12">
+                <p class="pm-help mb-0" id="wireOrderProgress"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="row">
-      <label><input id="aen" type="checkbox"/> Art-Net enable</label>
-      <label><input id="sen" type="checkbox"/> sACN enable</label>
-    </div>
-    <button class="primary" id="saveCfg">Save settings</button>
-    <div class="status" id="cfgStatus"></div>
-  </section>
-  <section>
-    <h2>Pixel Map Editor</h2>
-    <div class="row">
-      <div><label>Grid W</label><input id="mw" type="number" min="1" max="128"/></div>
-      <div><label>Grid H</label><input id="mh" type="number" min="1" max="128"/></div>
-    </div>
-    <button id="buildGrid">Build grid map</button>
-    <canvas id="mapCanvas" width="640" height="320"></canvas>
-    <p class="status">Drag pixels to edit spatial positions. Double-click toggles group.</p>
-    <button class="primary" id="saveMap">Save map</button>
-    <div class="status" id="mapStatus"></div>
-  </section>
-</main>
+  </div>
+</div>
+
+<script src="/vendor/bootstrap.bundle.min.js"></script>
 <script>
 let map = [];
+/** Settings signature last successfully built/loaded into `map`. */
+let mapBuiltSig = '';
 let drag = -1;
+let povAnim = 0;
+let povRaf = 0;
+let mapRaf = 0;
+let fxRaf = 0;
+let fxTabActive = false;
+let povTabActive = false;
+// Orbit: yaw = azimuth; pitch = elevation (+ = from above, − = from below). Nearly ±90°.
+const ORBIT_PITCH_MAX = 1.52;
+const DEFAULT_MAP_ORBIT = { yaw: 0.75, pitch: 0.55, zoom: 1.15 };
+const DEFAULT_FX_ORBIT = { yaw: 0.65, pitch: 0.5, zoom: 1.95 };
+const STRIP_MAX = 8;
+const STRIP_COLORS = ['#3dffa8','#7eb6ff','#ffb454','#e07aff','#ff6b6b','#5eead4','#f0e68c','#c4b5fd'];
+/* WLED-friendly ESP32 defaults, then extra common / custom-hardware pins */
+const DEFAULT_STRIP_GPIOS = [16, 2, 4, 13, 14, 15, 18, 19];
+const GPIO_PRESETS = [
+  { v: 16, label: 'GPIO 16 — WLED ESP32 default' },
+  { v: 2, label: 'GPIO 2 — WLED / DevKit common' },
+  { v: 4, label: 'GPIO 4 — Ethernet-safe default' },
+  { v: 13, label: 'GPIO 13' },
+  { v: 14, label: 'GPIO 14' },
+  { v: 15, label: 'GPIO 15' },
+  { v: 18, label: 'GPIO 18' },
+  { v: 19, label: 'GPIO 19' },
+  { v: 21, label: 'GPIO 21' },
+  { v: 22, label: 'GPIO 22' },
+  { v: 23, label: 'GPIO 23' },
+  { v: 25, label: 'GPIO 25' },
+  { v: 26, label: 'GPIO 26' },
+  { v: 27, label: 'GPIO 27' },
+  { v: 32, label: 'GPIO 32' },
+  { v: 33, label: 'GPIO 33' },
+  { v: 38, label: 'GPIO 38 — ESP32-S3 boards' },
+  { v: -1, label: 'Custom…' },
+];
+let mapOrbit = { ...DEFAULT_MAP_ORBIT, dragging: false, lastX: 0, lastY: 0 };
+let fxOrbit = { ...DEFAULT_FX_ORBIT, dragging: false, lastX: 0, lastY: 0 };
+let mapProj = []; // screen projections for hit-testing in 3D
+let wireMode = false;
+let wireRoute = []; // map-array indices in click order for the active strip
+
+function setStatus(el, ok, text){
+  el.textContent = text || '';
+  el.className = 'pm-status ' + (ok ? 'ok' : (text ? 'err' : ''));
+}
+
+function fmt1(n){
+  const v = +n;
+  if (!Number.isFinite(v)) return '0.0';
+  return v.toFixed(1);
+}
+
+function stripCount(){
+  return Math.max(1, Math.min(STRIP_MAX, +scnt.value | 0));
+}
+
+function stripLengths(){
+  const n = stripCount();
+  const lens = [];
+  for (let i = 0; i < n; i++) {
+    const el = document.getElementById('slen' + i);
+    lens.push(Math.max(1, Math.min(4096, +(el && el.value) || 1)));
+  }
+  return lens;
+}
+
+function stripGpios(){
+  const n = stripCount();
+  const gpios = [];
+  for (let i = 0; i < n; i++) {
+    const sel = document.getElementById('sgpio' + i);
+    const custom = document.getElementById('sgpioCustom' + i);
+    let g = DEFAULT_STRIP_GPIOS[i] ?? 16;
+    if (sel) {
+      const sv = +sel.value;
+      if (sv === -1 && custom) g = Math.max(0, Math.min(48, +custom.value | 0));
+      else if (sv >= 0) g = sv;
+    }
+    gpios.push(g);
+  }
+  return gpios;
+}
+
+function stripBase(si){
+  const lens = stripLengths();
+  let b = 0;
+  for (let i = 0; i < si && i < lens.length; i++) b += lens[i];
+  return b;
+}
+
+function totalPixels(){
+  return stripLengths().reduce((a, b) => a + b, 0);
+}
+
+function syncStripGpioWarn(){
+  const gpios = stripGpios();
+  const sledPin = +sled.value;
+  const msgs = [];
+  const seen = new Map();
+  gpios.forEach((g, i) => {
+    if (seen.has(g)) msgs.push('Strip ' + (i + 1) + ' and Strip ' + (seen.get(g) + 1) + ' share GPIO ' + g + '.');
+    else seen.set(g, i);
+    if (sledPin >= 0 && g === sledPin) {
+      msgs.push('Strip ' + (i + 1) + ' uses GPIO ' + g + ' — same as status LED (status LED will be disabled).');
+    }
+  });
+  if (msgs.length) {
+    stripGpioWarn.hidden = false;
+    stripGpioWarn.textContent = msgs.join(' ');
+  } else {
+    stripGpioWarn.hidden = true;
+    stripGpioWarn.textContent = '';
+  }
+}
+
+function syncStripTotal(){
+  const total = Math.min(4096, totalPixels());
+  count.value = String(total);
+  countTotal.textContent = String(total);
+  const gpios = stripGpios();
+  gpio.value = String(gpios[0] ?? 16);
+  const warn = stripBudgetWarn;
+  if (totalPixels() > 4096) {
+    warn.hidden = false;
+    warn.textContent = 'Strip lengths sum to ' + totalPixels() + ' — controller max is 4096. Excess will be clamped on save.';
+  } else {
+    warn.hidden = true;
+    warn.textContent = '';
+  }
+  syncStripGpioWarn();
+  return total;
+}
+
+function fillGpioSelect(sel, current){
+  sel.innerHTML = '';
+  let matched = false;
+  GPIO_PRESETS.forEach(p => {
+    if (p.v < 0) return;
+    const opt = document.createElement('option');
+    opt.value = String(p.v);
+    opt.textContent = p.label;
+    if (p.v === current) { opt.selected = true; matched = true; }
+    sel.appendChild(opt);
+  });
+  const customOpt = document.createElement('option');
+  customOpt.value = '-1';
+  customOpt.textContent = 'Custom…';
+  if (!matched) customOpt.selected = true;
+  sel.appendChild(customOpt);
+}
+
+function rebuildStripLenFields(preserveLens, preserveGpios){
+  const n = stripCount();
+  const prevL = preserveLens || stripLengths();
+  const prevG = preserveGpios || (() => {
+    try { return stripGpios(); } catch (_) { return []; }
+  })();
+  stripBusFields.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const row = document.createElement('div');
+    row.className = 'strip-bus-row row g-2 align-items-end';
+    const title = document.createElement('div');
+    title.className = 'col-12';
+    title.innerHTML = '<span class="form-label mb-0">Strip ' + (i + 1) + '</span>';
+    row.appendChild(title);
+
+    const lenCol = document.createElement('div');
+    lenCol.className = 'col-6 col-md-3';
+    lenCol.innerHTML = '<label class="form-label" for="slen' + i + '">Pixels</label>';
+    const inp = document.createElement('input');
+    inp.className = 'form-control';
+    inp.id = 'slen' + i;
+    inp.type = 'number';
+    inp.min = '1';
+    inp.max = '4096';
+    inp.value = String(prevL[i] || (i === 0 ? (+count.value || 60) : 30));
+    inp.addEventListener('input', ()=>{ syncStripTotal(); syncRouteStripSelect(); syncMapBudget(); });
+    inp.addEventListener('change', ()=>{ syncStripTotal(); syncRouteStripSelect(); syncMapBudget(); });
+    lenCol.appendChild(inp);
+    row.appendChild(lenCol);
+
+    const gpioCol = document.createElement('div');
+    gpioCol.className = 'col-6 col-md-5';
+    gpioCol.innerHTML = '<label class="form-label" for="sgpio' + i + '">Data GPIO</label>';
+    const sel = document.createElement('select');
+    sel.className = 'form-select';
+    sel.id = 'sgpio' + i;
+    const g = (prevG[i] != null) ? prevG[i] : (DEFAULT_STRIP_GPIOS[i] ?? 16);
+    fillGpioSelect(sel, g);
+    gpioCol.appendChild(sel);
+    row.appendChild(gpioCol);
+
+    const customCol = document.createElement('div');
+    customCol.className = 'col-6 col-md-2';
+    customCol.innerHTML = '<label class="form-label" for="sgpioCustom' + i + '">Custom #</label>';
+    const custom = document.createElement('input');
+    custom.className = 'form-control strip-gpio-custom';
+    custom.id = 'sgpioCustom' + i;
+    custom.type = 'number';
+    custom.min = '0';
+    custom.max = '48';
+    custom.value = String(g);
+    const syncCustomVis = ()=>{
+      const isCustom = +sel.value === -1;
+      customCol.classList.toggle('d-none', !isCustom);
+      if (!isCustom) custom.value = sel.value;
+    };
+    sel.addEventListener('change', ()=>{ syncCustomVis(); syncStripTotal(); syncRouteStripSelect(); });
+    custom.addEventListener('input', ()=>{ syncStripTotal(); syncRouteStripSelect(); });
+    customCol.appendChild(custom);
+    row.appendChild(customCol);
+    syncCustomVis();
+
+    stripBusFields.appendChild(row);
+  }
+  syncStripTotal();
+  syncRouteStripSelect();
+}
+
+function syncRouteStripSelect(){
+  const n = stripCount();
+  const cur = +routeStrip.value || 0;
+  routeStrip.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    const g = stripGpios()[i];
+    opt.textContent = 'Strip ' + (i + 1) + ' (' + (stripLengths()[i] || 0) + ' px · GPIO ' + g + ')';
+    routeStrip.appendChild(opt);
+  }
+  routeStrip.value = String(Math.min(cur, n - 1));
+  document.querySelectorAll('.gate-multistrip').forEach(el => {
+    el.classList.toggle('d-none', n < 2);
+  });
+  updateWireProgress();
+}
+
+/* ===== Effect parameter sliders + DMX channel bindings ===== */
+const FXPARAM = {
+  SPEED: 0, SCALE: 1, INTENSITY: 2,
+  PH: 3, PS: 4, PV: 5, SH: 6, SS: 7, SV: 8,
+  P1: 9, P2: 10, P3: 11, P4: 12, P5: 13, P6: 14, P7: 15, P8: 16,
+  POSX: 17, POSY: 18, POSZ: 19,
+  ROTX: 20, ROTY: 21, ROTZ: 22,
+  COUNT: 23
+};
+const FXM = {
+  SPD: 1 << 0, SCL: 1 << 1, INT: 1 << 2,
+  PRI: (1 << 3) | (1 << 4) | (1 << 5),
+  SEC: (1 << 6) | (1 << 7) | (1 << 8),
+  P1: 1 << 9, P2: 1 << 10, PALL: 0xFF << 9,
+  GEO: (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20) | (1 << 21) | (1 << 22)
+};
+function fxIsPKnob(id){ return id >= FXPARAM.P1 && id <= FXPARAM.P8; }
+function fxIsPos(id){ return id >= FXPARAM.POSX && id <= FXPARAM.POSZ; }
+function fxIsRot(id){ return id >= FXPARAM.ROTX && id <= FXPARAM.ROTZ; }
+function fxParamMask(id){
+  id |= 0;
+  if (id === 0) return FXM.INT | FXM.PRI;
+  if (id === 1 || id === 6) return FXM.SPD | FXM.SCL | FXM.INT | FXM.GEO;
+  if (id === 2) return FXM.SPD | FXM.SCL | FXM.INT | FXM.PRI | FXM.SEC | FXM.P1 | FXM.GEO;
+  if (id === 3) return FXM.SPD | FXM.SCL | FXM.INT | FXM.PRI | FXM.P1 | FXM.GEO;
+  if (id === 4 || id === 5) return FXM.SPD | FXM.SCL | FXM.INT | FXM.PRI | FXM.SEC | FXM.P1 | FXM.GEO;
+  if (id === 25) return (1 << FXPARAM.COUNT) - 1;
+  /* Geometric: Scale owns spatial frequency — no Density/Thickness */
+  if (id >= 7 && id <= 24) return FXM.SPD | FXM.SCL | FXM.INT | FXM.PRI | FXM.SEC | FXM.GEO;
+  return FXM.SPD | FXM.SCL | FXM.INT | FXM.PRI | FXM.GEO;
+}
+function fxPLabels(id){
+  id |= 0;
+  const lua = Array.from({length: 8}, (_, i) => 'p' + (i + 1));
+  if (id === 25) return lua;
+  if (id === 2) return ['Complexity', ...lua.slice(1)];
+  if (id === 3) return ['Contrast', ...lua.slice(1)];
+  if (id === 4) return ['Wave count', ...lua.slice(1)];
+  if (id === 5) return ['Band width', ...lua.slice(1)];
+  return lua;
+}
+/** Fixed DMX channels — shared controls keep stable addresses across effects. */
+const FX_FIXED_CH = Object.freeze([
+  1, 2, 3,           /* speed, scale, intensity */
+  4, 5, 6,           /* primary H/S/V */
+  7, 8, 9,           /* secondary H/S/V */
+  10, 11, 12, 13, 14, 15, 16, 17,  /* p1..p8 */
+  18, 19, 20,        /* pos x/y/z */
+  21, 22, 23         /* rot x/y/z */
+]);
+const FX_PARAM_META = [
+  { id: FXPARAM.SPEED, key: 'speed', label: 'Speed', min: 0, max: 10, step: 0.1, def: 1 },
+  { id: FXPARAM.SCALE, key: 'scale', label: 'Scale', min: 0.1, max: 8, step: 0.1, def: 1 },
+  { id: FXPARAM.INTENSITY, key: 'fxint', label: 'Intensity', min: 0, max: 255, step: 1, def: 255 },
+  { id: FXPARAM.PH, key: 'ph', label: 'Hue', min: 0, max: 255, step: 1, def: 0 },
+  { id: FXPARAM.PS, key: 'ps', label: 'Sat', min: 0, max: 255, step: 1, def: 255 },
+  { id: FXPARAM.PV, key: 'pv', label: 'Val', min: 0, max: 255, step: 1, def: 255 },
+  { id: FXPARAM.SH, key: 'sh', label: 'Hue 2', min: 0, max: 255, step: 1, def: 160 },
+  { id: FXPARAM.SS, key: 'ss', label: 'Sat 2', min: 0, max: 255, step: 1, def: 255 },
+  { id: FXPARAM.SV, key: 'sv', label: 'Val 2', min: 0, max: 255, step: 1, def: 255 },
+  { id: FXPARAM.P1, key: 'p1', label: 'p1', min: 0, max: 255, step: 1, def: 128 },
+  { id: FXPARAM.P2, key: 'p2', label: 'p2', min: 0, max: 255, step: 1, def: 64 },
+  { id: FXPARAM.P3, key: 'p3', label: 'p3', min: 0, max: 255, step: 1, def: 0 },
+  { id: FXPARAM.P4, key: 'p4', label: 'p4', min: 0, max: 255, step: 1, def: 0 },
+  { id: FXPARAM.P5, key: 'p5', label: 'p5', min: 0, max: 255, step: 1, def: 0 },
+  { id: FXPARAM.P6, key: 'p6', label: 'p6', min: 0, max: 255, step: 1, def: 0 },
+  { id: FXPARAM.P7, key: 'p7', label: 'p7', min: 0, max: 255, step: 1, def: 0 },
+  { id: FXPARAM.P8, key: 'p8', label: 'p8', min: 0, max: 255, step: 1, def: 0 },
+  { id: FXPARAM.POSX, key: 'posx', label: 'Pos X', min: 0, max: 255, step: 1, def: 128 },
+  { id: FXPARAM.POSY, key: 'posy', label: 'Pos Y', min: 0, max: 255, step: 1, def: 128 },
+  { id: FXPARAM.POSZ, key: 'posz', label: 'Pos Z', min: 0, max: 255, step: 1, def: 128 },
+  { id: FXPARAM.ROTX, key: 'rotx', label: 'Rot X', min: 0, max: 255, step: 1, def: 0 },
+  { id: FXPARAM.ROTY, key: 'roty', label: 'Rot Y', min: 0, max: 255, step: 1, def: 0 },
+  { id: FXPARAM.ROTZ, key: 'rotz', label: 'Rot Z', min: 0, max: 255, step: 1, def: 0 },
+];
+let fxParamState = {
+  speed: 1, scale: 1, fxint: 255,
+  ph: 0, ps: 255, pv: 255, sh: 160, ss: 255, sv: 255,
+  fxp: [128, 64, 0, 0, 0, 0, 0, 0],
+  fxpos: [128, 128, 128],
+  fxrot: [0, 0, 0],
+};
+const FX_MOD_NAMES = ['Off', 'Sine', 'Ramp', 'Square', 'Saw', 'Noise'];
+function defaultFxMod(){ return { shape: 0, depth: 128, rate: 40, phase: 0 }; }
+let fxModState = Array.from({ length: FXPARAM.COUNT }, defaultFxMod);
+/** Snapshot used while rendering (base + modulators). */
+let fxRenderState = null;
+let ctlTabActive = false;
+let ctlRaf = 0;
+
+function fxActiveState(){ return fxRenderState || fxParamState; }
+function fxGetBase(meta){
+  if (meta.id === FXPARAM.SPEED) return +fxParamState.speed;
+  if (meta.id === FXPARAM.SCALE) return +fxParamState.scale;
+  if (meta.id === FXPARAM.INTENSITY) return fxParamState.fxint | 0;
+  if (fxIsPKnob(meta.id)) return fxParamState.fxp[meta.id - FXPARAM.P1] | 0;
+  if (fxIsPos(meta.id)) return fxParamState.fxpos[meta.id - FXPARAM.POSX] | 0;
+  if (fxIsRot(meta.id)) return fxParamState.fxrot[meta.id - FXPARAM.ROTX] | 0;
+  return fxParamState[meta.key] | 0;
+}
+function fxSetBase(meta, v){
+  if (meta.id === FXPARAM.SPEED) fxParamState.speed = v;
+  else if (meta.id === FXPARAM.SCALE) fxParamState.scale = v;
+  else if (meta.id === FXPARAM.INTENSITY) fxParamState.fxint = v | 0;
+  else if (fxIsPKnob(meta.id)) fxParamState.fxp[meta.id - FXPARAM.P1] = v | 0;
+  else if (fxIsPos(meta.id)) fxParamState.fxpos[meta.id - FXPARAM.POSX] = v | 0;
+  else if (fxIsRot(meta.id)) fxParamState.fxrot[meta.id - FXPARAM.ROTX] = v | 0;
+  else fxParamState[meta.key] = v | 0;
+  speed.value = String(fxParamState.speed);
+}
+/** True when Effects slider is driven externally (DMX stream or local modulator). */
+function fxParamExternallyDriven(meta){
+  if (dmxNetEnabled() && (+dmxmode.value | 0) === 1) return true;
+  const m = fxModState[meta.id];
+  return !!(fxModsAllowed() && m && (m.shape | 0));
+}
+function fxParamLockReason(meta){
+  if (dmxNetEnabled() && (+dmxmode.value | 0) === 1) {
+    return aen.checked ? 'Art-Net ch ' + FX_FIXED_CH[meta.id] : 'sACN ch ' + FX_FIXED_CH[meta.id];
+  }
+  const m = fxModState[meta.id];
+  if (fxModsAllowed() && m && (m.shape | 0)) {
+    return (FX_MOD_NAMES[m.shape | 0] || 'Mod') + ' modulator';
+  }
+  return '';
+}
+/** Keep Control base widgets locked to fxParamState. */
+function syncParamBaseDom(meta, opts){
+  const skipCtl = opts && opts.skipCtl;
+  const base = fxGetBase(meta);
+  const text = fxFmtVal(meta, base);
+  if (!skipCtl) {
+    const ctlBase = document.getElementById('ctlbase_' + meta.id);
+    const ctlBaseVal = document.getElementById('ctlbasev_' + meta.id);
+    const active = document.activeElement;
+    const editingCtl = active && (active.id === 'ctlbase_' + meta.id);
+    if (ctlBase && !editingCtl) ctlBase.value = String(base);
+    if (ctlBaseVal && !editingCtl) ctlBaseVal.textContent = text;
+  }
+}
+/**
+ * Effects sliders follow live output when driven by modulator/DMX.
+ * Driven rows are greyed out and not editable.
+ */
+function applyLiveToFxSliders(live){
+  if (!live) live = fxComputeLive(performance.now());
+  FX_PARAM_META.forEach((meta) => {
+    const row = document.getElementById('fxprow_' + meta.id);
+    const fxRange = document.getElementById('fxp_' + meta.id);
+    const fxShown = document.getElementById('fxpv_' + meta.id);
+    if (!fxRange && !fxShown) return;
+    const driven = fxParamExternallyDriven(meta);
+    const reason = fxParamLockReason(meta);
+    const base = fxGetBase(meta);
+    const m = fxModState[meta.id];
+    const modOn = !!(fxModsAllowed() && m && (m.shape | 0));
+    const raw = modOn ? fxLiveRaw(meta, live) : base;
+    if (row) {
+      row.classList.toggle('is-locked', driven);
+      row.title = driven
+        ? (fxParamLabel(meta, +fx.value) + ' · controlled by ' + reason)
+        : (fxParamLabel(meta, +fx.value) + ' · DMX ch ' + FX_FIXED_CH[meta.id]);
+    }
+    if (fxRange) {
+      fxRange.disabled = driven;
+      fxRange.value = String(raw);
+    }
+    if (fxShown) {
+      fxShown.textContent = fxFmtVal(meta, raw);
+      fxShown.title = driven ? ('live · ' + reason) : '';
+    }
+  });
+}
+let fxPushTimer = 0;
+function scheduleFxPush(){
+  clearTimeout(fxPushTimer);
+  fxPushTimer = setTimeout(() => {
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collectConfig()),
+    }).catch(() => {});
+  }, 140);
+}
+function notifyFxParamsChanged(){
+  FX_PARAM_META.forEach((meta) => syncParamBaseDom(meta));
+  applyLiveToFxSliders();
+  if (fxTabActive) startFxAnim();
+  if (ctlTabActive) startCtlAnim();
+  scheduleFxPush();
+}
+function fxFmtVal(meta, v){
+  if (fxIsPos(meta.id)) return ((+v / 255) - 0.5).toFixed(2);
+  if (fxIsRot(meta.id)) return Math.round((+v / 255) * 360) + '°';
+  return (meta.step < 1) ? (+v).toFixed(1) : String(v | 0);
+}
+function fxParamLabel(meta, effectId){
+  if (fxIsPKnob(meta.id)) {
+    return fxPLabels(effectId)[meta.id - FXPARAM.P1] || meta.label;
+  }
+  return meta.label;
+}
+function fxModRateHz(rate){ return 0.05 + ((rate | 0) / 255) * 7.95; }
+function fxModHash01(x){
+  x = (x >>> 0) ^ ((x >>> 0) >>> 16);
+  x = Math.imul(x, 0x7feb352d) >>> 0;
+  x = x ^ (x >>> 15);
+  x = Math.imul(x, 0x846ca68b) >>> 0;
+  x = x ^ (x >>> 16);
+  return (x & 0xffffff) / 0x1000000;
+}
+function fxModWave(shape, phase01, seed){
+  phase01 = phase01 - Math.floor(phase01);
+  switch (shape | 0) {
+    case 1: return 0.5 + 0.5 * Math.sin(phase01 * Math.PI * 2);
+    case 2: return phase01;
+    case 3: return phase01 < 0.5 ? 1 : 0;
+    case 4: {
+      let p = phase01 + 0.25;
+      p = p - Math.floor(p);
+      return p < 0.5 ? p * 2 : (1 - p) * 2;
+    }
+    case 5: {
+      const step = Math.floor(phase01 * 32);
+      return fxModHash01(step + 1 + (seed | 0) * 131);
+    }
+    default: return 0.5;
+  }
+}
+function fxModMix(base, lo, hi, wave, depth){
+  if (hi <= lo) return base;
+  const span = hi - lo;
+  const center = (base - lo) / span;
+  const outN = Math.max(0, Math.min(1, center + (wave - 0.5) * 2 * depth));
+  return lo + outN * span;
+}
+function dmxNetEnabled(){
+  return !!(aen && aen.checked) || !!(sen && sen.checked);
+}
+function fxModsAllowed(){
+  return !dmxNetEnabled();
+}
+function syncDmxProtocolExclusive(source){
+  if (!aen || !sen) return;
+  if (source === 'aen' && aen.checked) sen.checked = false;
+  if (source === 'sen' && sen.checked) aen.checked = false;
+  if (aen.checked && sen.checked) sen.checked = false;
+  syncCtlModVisibility();
+}
+function syncCtlModVisibility(){
+  const allow = fxModsAllowed();
+  const help = document.getElementById('ctlChannelHelp');
+  if (help) {
+    help.textContent = allow
+      ? 'Fixed map · ch 1–23. Live meters show base + modulator. Labels follow the current effect.'
+      : 'Fixed map · ch 1–23. DMX is on — modulators are hidden; channels follow the network stream.';
+  }
+  document.querySelectorAll('.ctl-mod-row').forEach((el) => {
+    el.hidden = !allow;
+  });
+}
+function fxComputeLive(timeMs){
+  const out = {
+    speed: +fxParamState.speed,
+    scale: +fxParamState.scale || 1,
+    fxint: fxParamState.fxint | 0,
+    ph: fxParamState.ph | 0, ps: fxParamState.ps | 0, pv: fxParamState.pv | 0,
+    sh: fxParamState.sh | 0, ss: fxParamState.ss | 0, sv: fxParamState.sv | 0,
+    fxp: fxParamState.fxp.map(x => x | 0),
+    fxpos: fxParamState.fxpos.map(x => x | 0),
+    fxrot: fxParamState.fxrot.map(x => x | 0),
+  };
+  if (!fxModsAllowed()) return out;
+  const t = (timeMs || 0) * 0.001;
+  FX_PARAM_META.forEach((meta) => {
+    const m = fxModState[meta.id] || defaultFxMod();
+    if (!(m.shape | 0) || !(m.depth | 0)) return;
+    const wave = fxModWave(m.shape, t * fxModRateHz(m.rate) + (m.phase | 0) / 255,
+      meta.id * 17 + (m.phase | 0));
+    const depth = (m.depth | 0) / 255;
+    if (meta.id === FXPARAM.SPEED) {
+      out.speed = fxModMix(out.speed, meta.min, meta.max, wave, depth);
+    } else if (meta.id === FXPARAM.SCALE) {
+      out.scale = fxModMix(out.scale, meta.min, meta.max, wave, depth);
+    } else if (meta.id === FXPARAM.INTENSITY) {
+      out.fxint = Math.round(fxModMix(out.fxint, meta.min, meta.max, wave, depth));
+    } else if (fxIsPKnob(meta.id)) {
+      const i = meta.id - FXPARAM.P1;
+      out.fxp[i] = Math.round(fxModMix(out.fxp[i], meta.min, meta.max, wave, depth));
+    } else if (fxIsPos(meta.id)) {
+      const i = meta.id - FXPARAM.POSX;
+      out.fxpos[i] = Math.round(fxModMix(out.fxpos[i], meta.min, meta.max, wave, depth));
+    } else if (fxIsRot(meta.id)) {
+      const i = meta.id - FXPARAM.ROTX;
+      out.fxrot[i] = Math.round(fxModMix(out.fxrot[i], meta.min, meta.max, wave, depth));
+    } else {
+      out[meta.key] = Math.round(fxModMix(out[meta.key], meta.min, meta.max, wave, depth));
+    }
+  });
+  return out;
+}
+function fxLiveNorm(meta, live){
+  let v;
+  if (meta.id === FXPARAM.SPEED) v = live.speed;
+  else if (meta.id === FXPARAM.SCALE) v = live.scale;
+  else if (meta.id === FXPARAM.INTENSITY) v = live.fxint;
+  else if (fxIsPKnob(meta.id)) v = live.fxp[meta.id - FXPARAM.P1];
+  else if (fxIsPos(meta.id)) v = live.fxpos[meta.id - FXPARAM.POSX];
+  else if (fxIsRot(meta.id)) v = live.fxrot[meta.id - FXPARAM.ROTX];
+  else v = live[meta.key];
+  return Math.max(0, Math.min(1, (+v - meta.min) / (meta.max - meta.min || 1)));
+}
+function fxLiveRaw(meta, live){
+  if (meta.id === FXPARAM.SPEED) return live.speed;
+  if (meta.id === FXPARAM.SCALE) return live.scale;
+  if (meta.id === FXPARAM.INTENSITY) return live.fxint;
+  if (fxIsPKnob(meta.id)) return live.fxp[meta.id - FXPARAM.P1];
+  if (fxIsPos(meta.id)) return live.fxpos[meta.id - FXPARAM.POSX];
+  if (fxIsRot(meta.id)) return live.fxrot[meta.id - FXPARAM.ROTX];
+  return live[meta.key];
+}
+
+function fxReadStateFromUI(){
+  speed.value = String(fxParamState.speed);
+}
+function syncFxLuaPanel(){
+  const panel = document.getElementById('fxLuaPanel');
+  if (panel) panel.hidden = (+fx.value | 0) !== 25;
+}
+
+function syncFxParamRows(){
+  syncFxLuaPanel();
+  const host = document.getElementById('fxParamRows');
+  if (!host) return;
+  const mask = fxParamMask(+fx.value);
+  host.innerHTML = '';
+  FX_PARAM_META.forEach((meta) => {
+    if (!(mask & (1 << meta.id))) return;
+    const label = fxParamLabel(meta, +fx.value);
+    const val = fxGetBase(meta);
+    const ch = FX_FIXED_CH[meta.id];
+    const row = document.createElement('div');
+    row.className = 'fx-param-row';
+    row.id = 'fxprow_' + meta.id;
+    row.title = label + ' · DMX ch ' + ch;
+    row.innerHTML =
+      '<label for="fxp_' + meta.id + '">' + label + '</label>' +
+      '<input type="range" id="fxp_' + meta.id + '" min="' + meta.min + '" max="' + meta.max +
+        '" step="' + meta.step + '" value="' + val + '"/>' +
+      '<span class="fx-param-val" id="fxpv_' + meta.id + '">' + fxFmtVal(meta, val) + '</span>' +
+      '<span class="fx-dmx-fixed">' + ch + '</span>';
+    host.appendChild(row);
+    const range = row.querySelector('input[type=range]');
+    const applyVal = () => {
+      if (fxParamExternallyDriven(meta) || range.disabled) return;
+      fxSetBase(meta, +range.value);
+      syncParamBaseDom(meta);
+      applyLiveToFxSliders();
+      if (fxTabActive) startFxAnim();
+      if (ctlTabActive) startCtlAnim();
+      scheduleFxPush();
+    };
+    range.addEventListener('input', applyVal);
+    range.addEventListener('change', applyVal);
+  });
+  fxReadStateFromUI();
+  applyLiveToFxSliders();
+  syncCtlChannelLabels();
+}
+
+function syncCtlChannelRows(){
+  const host = document.getElementById('ctlChannelRows');
+  if (!host) return;
+  const effectId = +fx.value | 0;
+  const mask = fxParamMask(effectId);
+  host.innerHTML = '';
+  FX_PARAM_META.forEach((meta) => {
+    const m = fxModState[meta.id] || defaultFxMod();
+    const used = !!(mask & (1 << meta.id));
+    const label = fxParamLabel(meta, effectId);
+    const ch = FX_FIXED_CH[meta.id];
+    const base = fxGetBase(meta);
+    const card = document.createElement('div');
+    card.className = 'ctl-channel' + (used ? '' : ' is-idle');
+    card.dataset.param = String(meta.id);
+    const modOpts = FX_MOD_NAMES.map((n, i) =>
+      '<option value="' + i + '"' + ((m.shape|0) === i ? ' selected' : '') + '>' + n + '</option>'
+    ).join('');
+    card.innerHTML =
+      '<div class="ctl-channel-top">' +
+        '<span class="ctl-ch">ch ' + ch + '</span>' +
+        '<span class="ctl-label" id="ctllbl_' + meta.id + '">' + label + '</span>' +
+        '<span class="ctl-fxrole" id="ctlrole_' + meta.id + '">' +
+          (used ? 'controls ' + label + ' on current effect' : 'unused by current effect') +
+        '</span>' +
+      '</div>' +
+      '<div class="ctl-live">' +
+        '<div class="ctl-meter" title="Live output"><i id="ctlmet_' + meta.id + '"></i></div>' +
+        '<span class="ctl-live-val" id="ctllive_' + meta.id + '">' + fxFmtVal(meta, base) + '</span>' +
+      '</div>' +
+      '<div class="ctl-base-row">' +
+        '<label for="ctlbase_' + meta.id + '">Base</label>' +
+        '<input type="range" id="ctlbase_' + meta.id + '" min="' + meta.min + '" max="' + meta.max +
+          '" step="' + meta.step + '" value="' + base + '"/>' +
+        '<span class="ctl-base-val" id="ctlbasev_' + meta.id + '">' + fxFmtVal(meta, base) + '</span>' +
+      '</div>' +
+      '<div class="ctl-mod-row' + ((m.shape|0) ? '' : ' is-off') + '" id="ctlmodrow_' + meta.id + '">' +
+        '<div><label class="form-label" for="ctlmod_' + meta.id + '">Modulator</label>' +
+          '<select class="form-select" id="ctlmod_' + meta.id + '">' + modOpts + '</select></div>' +
+        '<div class="ctl-mod-knob"><label class="form-label" for="ctlrate_' + meta.id + '">Rate</label>' +
+          '<input class="form-control" type="range" id="ctlrate_' + meta.id +
+            '" min="0" max="255" value="' + (m.rate|0) + '"/></div>' +
+        '<div class="ctl-mod-knob"><label class="form-label" for="ctldep_' + meta.id + '">Depth</label>' +
+          '<input class="form-control" type="range" id="ctldep_' + meta.id +
+            '" min="0" max="255" value="' + (m.depth|0) + '"/></div>' +
+        '<div class="ctl-mod-knob"><label class="form-label" for="ctlph_' + meta.id + '">Phase</label>' +
+          '<input class="form-control" type="range" id="ctlph_' + meta.id +
+            '" min="0" max="255" value="' + (m.phase|0) + '"/></div>' +
+      '</div>';
+    host.appendChild(card);
+
+    const baseEl = document.getElementById('ctlbase_' + meta.id);
+    const baseVal = document.getElementById('ctlbasev_' + meta.id);
+    const onBase = () => {
+      fxSetBase(meta, +baseEl.value);
+      if (baseVal) baseVal.textContent = fxFmtVal(meta, +baseEl.value);
+      syncParamBaseDom(meta, { skipCtl: true });
+      applyLiveToFxSliders();
+      if (fxTabActive) startFxAnim();
+      scheduleFxPush();
+    };
+    baseEl.addEventListener('input', onBase);
+    baseEl.addEventListener('change', onBase);
+
+    const modSel = document.getElementById('ctlmod_' + meta.id);
+    const rateEl = document.getElementById('ctlrate_' + meta.id);
+    const depEl = document.getElementById('ctldep_' + meta.id);
+    const phEl = document.getElementById('ctlph_' + meta.id);
+    const modRow = document.getElementById('ctlmodrow_' + meta.id);
+    const syncMod = () => {
+      fxModState[meta.id] = {
+        shape: +modSel.value | 0,
+        rate: +rateEl.value | 0,
+        depth: +depEl.value | 0,
+        phase: +phEl.value | 0,
+      };
+      modRow.classList.toggle('is-off', !(fxModState[meta.id].shape | 0));
+      applyLiveToFxSliders();
+      if (fxTabActive) startFxAnim();
+      scheduleFxPush();
+    };
+    modSel.addEventListener('change', syncMod);
+    rateEl.addEventListener('input', syncMod);
+    depEl.addEventListener('input', syncMod);
+    phEl.addEventListener('input', syncMod);
+  });
+  syncCtlModVisibility();
+  applyLiveToFxSliders();
+}
+function syncCtlChannelLabels(){
+  const host = document.getElementById('ctlChannelRows');
+  if (!host || !host.children.length) {
+    syncCtlChannelRows();
+    return;
+  }
+  const effectId = +fx.value | 0;
+  const mask = fxParamMask(effectId);
+  FX_PARAM_META.forEach((meta) => {
+    const card = host.querySelector('[data-param="' + meta.id + '"]');
+    if (!card) return;
+    const used = !!(mask & (1 << meta.id));
+    const label = fxParamLabel(meta, effectId);
+    card.classList.toggle('is-idle', !used);
+    const lbl = document.getElementById('ctllbl_' + meta.id);
+    const role = document.getElementById('ctlrole_' + meta.id);
+    if (lbl) lbl.textContent = label;
+    if (role) role.textContent = used ? ('controls ' + label + ' on current effect') : 'unused by current effect';
+  });
+}
+function updateCtlLiveMeters(timeMs){
+  const live = fxComputeLive(timeMs);
+  FX_PARAM_META.forEach((meta) => {
+    const met = document.getElementById('ctlmet_' + meta.id);
+    const val = document.getElementById('ctllive_' + meta.id);
+    if (!met && !val) return;
+    const raw = fxLiveRaw(meta, live);
+    if (met) met.style.width = (fxLiveNorm(meta, live) * 100).toFixed(1) + '%';
+    if (val) val.textContent = fxFmtVal(meta, raw);
+  });
+  applyLiveToFxSliders(live);
+}
+function drawCtlPreview(ts){
+  updateCtlLiveMeters(ts || performance.now());
+  if (ctlTabActive) ctlRaf = requestAnimationFrame(drawCtlPreview);
+}
+function startCtlAnim(){
+  cancelAnimationFrame(ctlRaf);
+  if (ctlTabActive) ctlRaf = requestAnimationFrame(drawCtlPreview);
+}
+function stopCtlAnim(){
+  ctlTabActive = false;
+  cancelAnimationFrame(ctlRaf);
+  ctlRaf = 0;
+}
+
+function collectFxConfig(){
+  return {
+    speed: +fxParamState.speed,
+    scale: +fxParamState.scale,
+    fxint: fxParamState.fxint | 0,
+    ph: fxParamState.ph | 0, ps: fxParamState.ps | 0, pv: fxParamState.pv | 0,
+    sh: fxParamState.sh | 0, ss: fxParamState.ss | 0, sv: fxParamState.sv | 0,
+    fxp: fxParamState.fxp.map(x => x | 0),
+    fxpos: fxParamState.fxpos.map(x => x | 0),
+    fxrot: fxParamState.fxrot.map(x => x | 0),
+    fxch: FX_FIXED_CH.slice(),
+    fxmod: fxModState.map(m => ({
+      shape: m.shape | 0, depth: m.depth | 0, rate: m.rate | 0, phase: m.phase | 0
+    })),
+    dmxmode: +dmxmode.value | 0,
+  };
+}
+function applyFxConfig(c){
+  if (!c) return;
+  if (c.speed != null) fxParamState.speed = +c.speed;
+  if (c.scale != null) fxParamState.scale = +c.scale || 1;
+  if (c.fxint != null) fxParamState.fxint = c.fxint | 0;
+  ['ph','ps','pv','sh','ss','sv'].forEach(k => { if (c[k] != null) fxParamState[k] = c[k] | 0; });
+  if (Array.isArray(c.fxp)) {
+    for (let i = 0; i < 8; i++) if (c.fxp[i] != null) fxParamState.fxp[i] = c.fxp[i] | 0;
+  }
+  if (Array.isArray(c.fxpos)) {
+    for (let i = 0; i < 3; i++) if (c.fxpos[i] != null) fxParamState.fxpos[i] = c.fxpos[i] | 0;
+  }
+  if (Array.isArray(c.fxrot)) {
+    for (let i = 0; i < 3; i++) if (c.fxrot[i] != null) fxParamState.fxrot[i] = c.fxrot[i] | 0;
+  }
+  if (Array.isArray(c.fxmod)) {
+    for (let i = 0; i < FXPARAM.COUNT; i++) {
+      const m = c.fxmod[i];
+      if (!m) continue;
+      fxModState[i] = {
+        shape: Math.max(0, Math.min(5, m.shape | 0)),
+        depth: m.depth | 0,
+        rate: m.rate | 0,
+        phase: m.phase | 0,
+      };
+    }
+  }
+  if (c.dmxmode != null && document.getElementById('dmxmode')) dmxmode.value = String(c.dmxmode | 0);
+  speed.value = String(fxParamState.speed);
+  syncFxParamRows();
+  syncCtlChannelRows();
+}
+
+function collectConfig(){
+  const slens = stripLengths();
+  const sgpios = stripGpios();
+  const total = Math.min(4096, slens.reduce((a, b) => a + b, 0));
+  count.value = String(total);
+  gpio.value = String(sgpios[0] ?? 16);
+  const fxc = collectFxConfig();
+  return {
+    ssid:ssid.value, pass:pass.value, host:host.value,
+    gpio:+gpio.value, sled:+sled.value, sledh:sledh.checked,
+    count:total, scnt:stripCount(), slens, sgpios,
+    bri:+bri.value, gamma:+gamma.value,
+    chip:chip.value, fx:+fx.value, ...fxc,
+    aun:+universe.value | 0, sun:+universe.value | 0,
+    aen:!!aen.checked, sen:!!sen.checked && !aen.checked,
+    mw:+mw.value, mh:+mh.value, md:+md.value, mdim:+mdim.value,
+    mlay:+mlay.value, mfill:+mfill.value,
+    mopentb: (+mfill.value|0) === 0 && !!mopentb.checked,
+    mspc:+(+mspc.value).toFixed(1),
+    pove:pove.checked, povm:+povm.value, poyl:+poyl.value, povbl:+povbl.value,
+    povrpm:+povrpm.value, povspd:+povspd.value, povrad:+povrad.value, povpath:+povpath.value
+  };
+}
+
+async function saveConfig(statusEl, note){
+  const body = collectConfig();
+  const r = await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  setStatus(statusEl, r.ok, r.ok ? (note || 'Saved.') : 'Save failed');
+  updateGates();
+}
+
+/** Shapes available per dimension — Custom is in both. */
+const LAYOUTS_2D = [
+  { v: 0, label: 'Grid' },
+  { v: 1, label: 'Circle' },
+  { v: 7, label: 'Custom formula' },
+];
+const LAYOUTS_3D = [
+  { v: 3, label: 'Box' },
+  { v: 2, label: 'Sphere' },
+  { v: 4, label: 'Cylinder' },
+  { v: 5, label: 'Dome' },
+  { v: 6, label: 'Pyramid' },
+  { v: 7, label: 'Custom formula' },
+];
+
+function layoutAllowed(lay, dim3){
+  const list = dim3 ? LAYOUTS_3D : LAYOUTS_2D;
+  return list.some(o => o.v === (lay | 0));
+}
+
+/** Map a layout across 2D↔3D when Dimension changes. */
+function coerceLayoutForDim(lay, dim3){
+  lay = lay | 0;
+  if (dim3) {
+    if (lay === 0) return 3; /* Grid → Box (solid lattice) */
+    if (lay === 1) return 2; /* Circle → Sphere */
+    if (layoutAllowed(lay, true)) return lay;
+    return 3;
+  }
+  if (lay === 2) return 1; /* Sphere → Circle */
+  if (lay === 3 || lay === 4 || lay === 5 || lay === 6) return 0;
+  if (layoutAllowed(lay, false)) return lay;
+  return 0;
+}
+
+let _layoutOptionsDim = -1;
+function syncLayoutOptions(){
+  const dim3 = +mdim.value === 1;
+  const dimKey = dim3 ? 1 : 0;
+  const list = dim3 ? LAYOUTS_3D : LAYOUTS_2D;
+  const prev = +mlay.value | 0;
+  let next = coerceLayoutForDim(prev, dim3);
+  if (dim3 && prev === 0) mfill.value = '1'; /* Grid → solid Box */
+  if (_layoutOptionsDim !== dimKey) {
+    mlay.innerHTML = list.map(o => '<option value="' + o.v + '">' + o.label + '</option>').join('');
+    _layoutOptionsDim = dimKey;
+  }
+  if (!list.some(o => o.v === next)) next = list[0].v;
+  mlay.value = String(next);
+  return next;
+}
+
+function mapLayout(){
+  const dim3 = +mdim.value === 1;
+  return coerceLayoutForDim(+mlay.value | 0, dim3);
+}
+
+function countDiskLattice(diam, sp){
+  if (diam < 1) return 0;
+  const R = diam < 2 ? 0 : 0.5 * (diam - 1) * sp;
+  const lim = Math.ceil(R / sp + 1e-4);
+  const r2 = R * R + 1e-4;
+  let n = 0;
+  for (let yi = -lim; yi <= lim; yi++)
+    for (let xi = -lim; xi <= lim; xi++) {
+      const x = xi * sp, y = yi * sp;
+      if (x * x + y * y <= r2) n++;
+    }
+  return n;
+}
+
+function countBallLattice(diam, sp){
+  if (diam < 1) return 0;
+  const R = diam < 2 ? 0 : 0.5 * (diam - 1) * sp;
+  const lim = Math.ceil(R / sp + 1e-4);
+  const r2 = R * R + 1e-4;
+  let n = 0;
+  for (let zi = -lim; zi <= lim; zi++)
+    for (let yi = -lim; yi <= lim; yi++)
+      for (let xi = -lim; xi <= lim; xi++) {
+        const x = xi * sp, y = yi * sp, z = zi * sp;
+        if (x * x + y * y + z * z <= r2) n++;
+      }
+  return n;
+}
+
+function mapWantedCount(){
+  const lay = mapLayout();
+  const fill = +mfill.value | 0;
+  const open = !!mopentb.checked && fill === 0;
+  const sp = Math.max(0.1, +mspc.value || 1);
+  const W = Math.max(1, +mw.value | 0), H = Math.max(1, +mh.value | 0);
+  const D = Math.max(1, +md.value | 0);
+  if (lay === 7) return Math.max(1, +count.value | 0);
+  if (lay === 0) return W * H;
+  if (lay === 1) {
+    if (fill === 1) return countDiskLattice(W, sp);
+    let n = 1;
+    const rings = W > 1 ? ((W - 1) / 2) | 0 : 0;
+    for (let r = 1; r <= rings; r++) n += Math.max(6, Math.round(2 * Math.PI * r));
+    return n;
+  }
+  if (lay === 2) {
+    if (fill === 1) return countBallLattice(W, sp);
+    const R = W < 2 ? sp : 0.5 * (W - 1) * sp;
+    return Math.max(1, Math.round(4 * Math.PI * (R / sp) * (R / sp)));
+  }
+  if (lay === 3) {
+    if (fill === 1) return W * H * D;
+    let n = 0;
+    for (let z = 0; z < D; z++)
+      for (let y = 0; y < H; y++)
+        for (let x = 0; x < W; x++) {
+          const wall = x === 0 || x === W - 1 || z === 0 || z === D - 1;
+          const tb = y === 0 || y === H - 1;
+          if (open ? wall : (wall || tb)) n++;
+        }
+    return n;
+  }
+  if (lay === 4) {
+    const circ = Math.max(6, Math.round(Math.PI * Math.max(1, W - 1)));
+    let n = circ * H;
+    if (!open) n += 2 * countDiskLattice(W, sp);
+    return n;
+  }
+  if (lay === 5) {
+    const R = W < 2 ? sp : 0.5 * (W - 1) * sp;
+    return Math.max(1, Math.round(2 * Math.PI * (R / sp) * (R / sp)));
+  }
+  if (lay === 6) {
+    const edge = Math.max(2, W), rise = Math.max(2, H);
+    let n = 4 * (edge - 1) + 4 * (rise - 1);
+    for (let r = 1; r < rise; r++) n += 4 * Math.max(1, edge - ((r * (edge - 1)) / rise) | 0);
+    return n;
+  }
+  return W * H * D;
+}
+
+function syncMapBudget(){
+  syncStripTotal();
+  const strip = Math.max(1, +count.value | 0);
+  const want = mapWantedCount();
+  const used = Math.min(want, strip);
+  const unused = Math.max(0, strip - used);
+  const over = want > strip;
+  const lay = mapLayout();
+  let msg = 'Shape uses ' + used + ' of ' + strip + ' strip pixels';
+  if (unused > 0 && !over) msg += ' · ' + unused + ' unused';
+  if (over) msg += ' · needs ' + want + ' (subsampled to strip length)';
+  mapBudgetHint.classList.toggle('err', over);
+  mapBudgetHint.textContent = msg + ' · ' + shapeLayoutName().toLowerCase() + '.';
+  if (over) {
+    mapBudgetWarn.hidden = false;
+    mapBudgetWarn.textContent = 'Shape wants ' + want + ' LEDs; strip only has ' + strip +
+      '. Lattice is subsampled so full dimensions are kept. Increase strip length for a denser map.';
+  } else if (unused > 0 && lay !== 7) {
+    mapBudgetWarn.hidden = false;
+    mapBudgetWarn.textContent = unused + ' strip pixel' + (unused === 1 ? '' : 's') +
+      ' unused — not included in the map math for this shape.';
+  } else {
+    mapBudgetWarn.hidden = true;
+    mapBudgetWarn.textContent = '';
+  }
+}
+
+function updateWireProgress(){
+  const si = +routeStrip.value | 0;
+  const need = stripLengths()[si] || 0;
+  const done = wireRoute.length;
+  if (wireMode) {
+    wireOrderProgress.textContent = 'Routing Strip ' + (si + 1) + ': ' + done + ' / ' + need +
+      (done >= need ? ' — complete.' : ' — click next LED.');
+  } else {
+    wireOrderProgress.textContent = '';
+  }
+}
+
+function setWireMode(on){
+  wireMode = !!on;
+  mapCanvas.classList.toggle('wire-mode', wireMode);
+  wireOrderBtn.textContent = wireMode ? 'Done routing' : 'Edit wire order';
+  const bar = document.getElementById('wireOrderBar');
+  if (bar) bar.hidden = !wireMode;
+  if (wireMode) {
+    beginWireRouteForStrip(+routeStrip.value | 0);
+  } else {
+    wireRoute = [];
+  }
+  updateWireProgress();
+  drawMap();
+}
+
+function beginWireRouteForStrip(si){
+  const base = stripBase(si);
+  const len = stripLengths()[si] || 0;
+  // Rebuild route from existing map addresses for this strip
+  wireRoute = [];
+  const byAddr = new Array(len).fill(-1);
+  map.forEach((p, mi) => {
+    const addr = p.i | 0;
+    if (addr >= base && addr < base + len) byAddr[addr - base] = mi;
+  });
+  for (let k = 0; k < len; k++) {
+    if (byAddr[k] >= 0) wireRoute.push(byAddr[k]);
+    else break;
+  }
+}
+
+function clearStripRoute(si){
+  const base = stripBase(si);
+  const len = stripLengths()[si] || 0;
+  map.forEach(p => {
+    const addr = p.i | 0;
+    if (addr >= base && addr < base + len) {
+      p.i = 65535; // unassigned marker until re-routed
+      p.g = 0;
+    }
+  });
+  wireRoute = [];
+}
+
+function applyWireAssignment(si){
+  const base = stripBase(si);
+  const len = stripLengths()[si] || 0;
+  // Clear previous owners of this strip's address range
+  map.forEach(p => {
+    const addr = p.i | 0;
+    if (addr >= base && addr < base + len) {
+      p.i = 65535;
+      if ((p.g | 0) === si + 1) p.g = 0;
+    }
+  });
+  wireRoute.forEach((mi, k) => {
+    if (mi < 0 || mi >= map.length || k >= len) return;
+    map[mi].i = base + k;
+    map[mi].g = si + 1;
+  });
+}
+
+function assignDefaultStripGroups(){
+  const lens = stripLengths();
+  const total = totalPixels();
+  map.forEach((p, mi) => {
+    let addr = (p.i != null && p.i !== 65535) ? (p.i | 0) : mi;
+    if (addr < 0 || addr >= total) addr = mi;
+    p.i = addr;
+    let acc = 0, g = 1;
+    for (let s = 0; s < lens.length; s++) {
+      if (addr < acc + lens[s]) { g = s + 1; break; }
+      acc += lens[s];
+    }
+    p.g = g;
+  });
+}
+
+/** Recover lattice cell from a normalized map point. */
+function pointToCell(p){
+  const c = layoutContentSize();
+  const content = Math.max(c.sx, c.sy, c.sz, c.sp, 1e-6);
+  const sp = Math.max(1e-6, c.sp);
+  const xi = Math.round(((p.x || 0) * content) / sp);
+  const yi = Math.round(((p.y || 0) * content) / sp);
+  const zi = Math.round(((p.z || 0) * content) / sp);
+  return { xi, yi, zi };
+}
+
+/**
+ * Forward index sequence for an axis (lattice coords: x L→R, y T→B, z F→B).
+ * y=0 is bottom in the map builder, so Top→Bottom uses high→low.
+ */
+function axisSequence(axis, n, reverse){
+  const seq = [];
+  if (axis === 'y') {
+    // Forward Top→Bottom: H-1 .. 0
+    for (let i = 0; i < n; i++) seq.push(reverse ? i : (n - 1 - i));
+  } else {
+    for (let i = 0; i < n; i++) seq.push(reverse ? (n - 1 - i) : i);
+  }
+  return seq;
+}
+
+/**
+ * Scan map indices in axis order.
+ * order: 3 chars from {x,y,z}, slowest → fastest.
+ * X = Left→Right, Y = Top→Bottom, Z = Front→Back.
+ */
+function scanMapIndices(order, zigzag){
+  const axes = String(order || 'xyz').split('');
+  if (axes.length !== 3) return map.map((_, i) => i);
+  const W = Math.max(1, +mw.value | 0);
+  const H = Math.max(1, +mh.value | 0);
+  const D = (+mdim.value === 1) ? Math.max(1, +md.value | 0) : 1;
+  const sizes = { x: W, y: H, z: Math.max(1, D) };
+  const a0 = axes[0], a1 = axes[1], a2 = axes[2];
+  const n0 = sizes[a0] || 1, n1 = sizes[a1] || 1, n2 = sizes[a2] || 1;
+
+  if (mapLayout() !== 0) {
+    const scored = map.map((p, mi) => {
+      const { xi, yi, zi } = pointToCell(p);
+      // Prefer top-first for Y in sort keys
+      const coord = { x: xi, y: -yi, z: zi };
+      return { mi, c0: coord[a0], c1: coord[a1], c2: coord[a2] };
+    });
+    scored.sort((a, b) => {
+      if (a.c0 !== b.c0) return a.c0 - b.c0;
+      const f1 = zigzag && (Math.abs(a.c0) & 1);
+      if (a.c1 !== b.c1) return f1 ? b.c1 - a.c1 : a.c1 - b.c1;
+      const f2 = zigzag && (Math.abs(a.c1) & 1);
+      return f2 ? b.c2 - a.c2 : a.c2 - b.c2;
+    });
+    return scored.map(s => s.mi);
+  }
+
+  const cellToMi = new Map();
+  map.forEach((p, mi) => {
+    const { xi, yi, zi } = pointToCell(p);
+    cellToMi.set(xi + ',' + yi + ',' + zi, mi);
+  });
+
+  const ordered = [];
+  const seq0 = axisSequence(a0, n0, false);
+  seq0.forEach((v0, i0) => {
+    const seq1 = axisSequence(a1, n1, zigzag && (i0 & 1));
+    seq1.forEach((v1, i1) => {
+      const seq2 = axisSequence(a2, n2, zigzag && (i1 & 1));
+      seq2.forEach(v2 => {
+        const coord = { x: 0, y: 0, z: 0 };
+        coord[a0] = v0; coord[a1] = v1; coord[a2] = v2;
+        const key = coord.x + ',' + coord.y + ',' + coord.z;
+        if (cellToMi.has(key)) ordered.push(cellToMi.get(key));
+      });
+    });
+  });
+  const used = new Set(ordered);
+  map.forEach((_, mi) => { if (!used.has(mi)) ordered.push(mi); });
+  return ordered;
+}
+
+function applyAutoRoute(){
+  if (!map.length) {
+    setStatus(mapStatus, false, 'Build a map first.');
+    return;
+  }
+  const si = +routeStrip.value | 0;
+  const order = autoRouteOrder.value || 'xyz';
+  const zigzag = autoRouteRun.value === 'zigzag';
+  const ordered = scanMapIndices(order, zigzag);
+  const base = stripBase(si);
+  const need = stripLengths()[si] || 0;
+  const slice = ordered.slice(base, base + need);
+  if (!slice.length) {
+    setStatus(mapStatus, false, 'No map cells to route for this strip.');
+    return;
+  }
+  if (!wireMode) setWireMode(true);
+  wireRoute = slice.slice();
+  applyWireAssignment(si);
+  updateWireProgress();
+  drawMap();
+  const label = autoRouteOrder.options[autoRouteOrder.selectedIndex].text;
+  const style = zigzag ? 'zig-zag' : 'start of each run';
+  setStatus(mapStatus, true, 'Auto-routed Strip ' + (si + 1) + ': ' + label + ' · ' + style + '.');
+}
+
+function drawWirePath(ctx){
+  if (!wireRoute.length) return;
+  ctx.strokeStyle = 'rgba(61,255,168,0.55)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  wireRoute.forEach((mi, k) => {
+    const pr = mapProj[mi];
+    if (!pr) return;
+    if (k === 0) ctx.moveTo(pr.sx, pr.sy);
+    else ctx.lineTo(pr.sx, pr.sy);
+  });
+  ctx.stroke();
+  const si = +routeStrip.value | 0;
+  wireRoute.forEach((mi, k) => {
+    const pr = mapProj[mi];
+    if (!pr) return;
+    ctx.fillStyle = '#0a0e0c';
+    ctx.beginPath();
+    ctx.arc(pr.sx, pr.sy, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = STRIP_COLORS[si % STRIP_COLORS.length];
+    ctx.beginPath();
+    ctx.arc(pr.sx, pr.sy, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e8f0ea';
+    ctx.font = '11px sans-serif';
+    ctx.fillText(String(k + 1), pr.sx + 8, pr.sy - 8);
+  });
+}
+
+function updateGates(){
+  const povOn = pove.checked;
+  const rot = +povm.value === 1;
+  const dim3 = +mdim.value === 1;
+  const lay = syncLayoutOptions();
+
+  const isGrid = lay === 0;
+  const isCircle = lay === 1;
+  const isSphere = lay === 2;
+  const isBox = lay === 3;
+  const isCyl = lay === 4;
+  const isDome = lay === 5;
+  const isPyr = lay === 6;
+  const isCustom = lay === 7;
+  const fillSolid = (+mfill.value | 0) === 1;
+  const show3dView = dim3 || isSphere || isBox || isCyl || isDome || isPyr || (isCustom && dim3);
+  const showFill = isCircle || isSphere || isBox;
+  const showOpenTb = (isBox && !fillSolid) || isCyl;
+  const showH = isGrid || isBox || isCyl || isPyr;
+  const showD = isBox;
+
+  povSettingsGate.classList.toggle('gated-disabled', !povOn);
+  document.querySelectorAll('.gate-rot').forEach(el => el.classList.toggle('gated-disabled', !povOn || !rot));
+  document.querySelectorAll('.gate-lin').forEach(el => el.classList.toggle('gated-disabled', !povOn || rot));
+  mapNormalGate.classList.toggle('gated-disabled', povOn);
+  mapPovHint.hidden = !povOn;
+
+  const fillLab = document.getElementById('mfillLabel');
+  const fillSel = document.getElementById('mfill');
+  if (isCircle) {
+    if (fillLab) fillLab.textContent = 'Circle fill';
+    if (fillSel && fillSel.options[0]) fillSel.options[0].textContent = 'Concentric rings';
+    if (fillSel && fillSel.options[1]) fillSel.options[1].textContent = 'Filled disk';
+  } else if (isBox) {
+    if (fillLab) fillLab.textContent = 'Fill mode';
+    if (fillSel && fillSel.options[0]) fillSel.options[0].textContent = 'Surface (faces)';
+    if (fillSel && fillSel.options[1]) fillSel.options[1].textContent = 'Solid lattice';
+  } else {
+    if (fillLab) fillLab.textContent = 'Fill mode';
+    if (fillSel && fillSel.options[0]) fillSel.options[0].textContent = 'Surface / shell';
+    if (fillSel && fillSel.options[1]) fillSel.options[1].textContent = 'Solid / filled';
+  }
+
+  const mwLab = document.getElementById('mwLabel');
+  const mhLab = document.getElementById('mhLabel');
+  const mdLab = document.getElementById('mdLabel');
+  if (isCircle || isSphere || isDome) {
+    if (mwLab) mwLab.textContent = 'Diameter (px)';
+  } else if (isCyl) {
+    if (mwLab) mwLab.textContent = 'Diameter (px)';
+    if (mhLab) mhLab.textContent = 'Height (px)';
+  } else if (isPyr) {
+    if (mwLab) mwLab.textContent = 'Base (px)';
+    if (mhLab) mhLab.textContent = 'Height (px)';
+  } else {
+    if (mwLab) mwLab.textContent = 'Width (px)';
+    if (mhLab) mhLab.textContent = 'Height (px)';
+    if (mdLab) mdLab.textContent = 'Depth (px)';
+  }
+
+  document.querySelectorAll('.gate-fill').forEach(el => el.classList.toggle('d-none', !showFill));
+  document.querySelectorAll('.gate-opentb').forEach(el => el.classList.toggle('d-none', !showOpenTb));
+  document.querySelectorAll('.gate-formula').forEach(el => {
+    el.hidden = !isCustom;
+    el.classList.toggle('d-none', !isCustom);
+  });
+  document.querySelectorAll('.gate-whd').forEach(el => el.classList.toggle('d-none', isCustom));
+  document.querySelectorAll('.gate-h').forEach(el => el.classList.toggle('d-none', isCustom || !showH));
+  document.querySelectorAll('.gate-d').forEach(el => el.classList.toggle('d-none', isCustom || !showD));
+  document.querySelectorAll('.gate-grid').forEach(el => {
+    const need3d = el.classList.contains('gate-3d');
+    el.classList.toggle('d-none', !(isGrid || (isBox && fillSolid)) || (need3d && !dim3 && !isBox));
+  });
+  document.querySelectorAll('.map-preview-tools .gate-3d').forEach(el => {
+    el.classList.toggle('d-none', !show3dView);
+    el.classList.toggle('gated-disabled', povOn);
+  });
+  const zWrap = mapZLayer && mapZLayer.closest('.gate-3d');
+  if (zWrap) {
+    zWrap.classList.toggle('d-none', !show3dView || !((isGrid || (isBox && fillSolid)) && dim3));
+  }
+
+  mapCanvas.classList.toggle('is-3d', show3dView && !povOn);
+  fxCanvas.classList.toggle('is-3d', show3dView);
+  document.getElementById('fxOrbitTools').classList.toggle('d-none', !show3dView);
+  syncRouteStripSelect();
+  syncZLayerControl();
+  syncMapBudget();
+  if (show3dView && !povOn) startMapAnim();
+  else {
+    cancelAnimationFrame(mapRaf);
+    drawMap();
+  }
+}
+
+function syncZLayerControl(){
+  const depth = Math.max(1, +md.value || 1);
+  const layers = Math.max(0, depth - 1);
+  mapZLayer.max = String(layers);
+  if (+mapZLayer.value > layers) mapZLayer.value = String(layers);
+  mapZLayerLabel.textContent = 'Layer ' + mapZLayer.value + ' / ' + layers +
+    (depth > 1 ? '  (Z ≈ ' + ((+mapZLayer.value) / layers).toFixed(2) + ')' : '');
+}
+
+/** Rest-pose blade diagram when POV mapping is off (no spinning strobe). */
+function drawPovRestPose(ctx, w, h){
+  ctx.strokeStyle = '#1c2621';
+  for (let x = 0; x < w; x += 32) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  for (let y = 0; y < h; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+  const m = povViewMetrics(w, h);
+  const nLed = Math.max(1, Math.min(1200, +count.value | 0));
+  const { blades, ppb } = povPixelsPerBlade(nLed);
+  const dotR = povLedDotRadiusPx(m, nLed);
+
+  if (m.mode === 2) {
+    ctx.strokeStyle = '#35584a';
+    ctx.strokeRect(
+      m.cx - m.halfPath * m.scale,
+      m.cy - m.yMax * m.scale,
+      m.path * m.scale,
+      (m.yMax - m.yMin) * m.scale
+    );
+  } else {
+    ctx.strokeStyle = '#2a3530';
+    ctx.beginPath(); ctx.arc(m.cx, m.cy, m.rPx, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.fillStyle = '#3dffa8';
+  ctx.beginPath(); ctx.arc(m.cx, m.cy, 3, 0, Math.PI * 2); ctx.fill();
+
+  drawPovArmsOverlay(ctx, m, nLed, 0, +fx.value, 0, 1, dotR);
+  ctx.fillStyle = '#8aa093';
+  ctx.font = '12px sans-serif';
+  ctx.fillText('Rest pose · ' + ppb + ' LEDs'
+    + (m.mode === 1 ? ' / blade · ' + blades + ' blades' : ' on wand')
+    + ' · enable POV for trail', 12, 20);
+}
+
+function drawPov(ts){
+  const cv = povCanvas, ctx = cv.getContext('2d');
+  const w = cv.width, h = cv.height;
+  ctx.fillStyle = '#0a0e0c';
+  ctx.fillRect(0, 0, w, h);
+
+  if (!pove.checked) {
+    drawPovRestPose(ctx, w, h);
+    return;
+  }
+
+  const id = +fx.value;
+  const timeMs = ts || 0;
+  drawFxPovPreview(ctx, w, h, id, timeMs, 1, null);
+
+  if (povTabActive) povRaf = requestAnimationFrame(drawPov);
+}
+
+function startPovAnim(){
+  cancelAnimationFrame(povRaf);
+  if (povTabActive) povRaf = requestAnimationFrame(drawPov);
+  else drawPov(0);
+}
+
+function stopPovAnim(){
+  povTabActive = false;
+  cancelAnimationFrame(povRaf);
+}
 
 async function loadCfg(){
   const r = await fetch('/api/config');
   const c = await r.json();
   ssid.value=c.ssid||''; pass.value=c.pass||''; host.value=c.host||'pixelmap';
-  gpio.value=c.gpio; count.value=c.count; bri.value=c.bri; gamma.value=c.gamma;
-  sled.value=c.sled??2; sledh.checked=c.sledh!==false;
-  chip.value=c.chip||'WS2812B'; fx.value=c.fx; speed.value=c.speed??1;
-  aun.value=c.aun; sun.value=c.sun; aen.checked=!!c.aen; sen.checked=!!c.sen;
-  mw.value=c.mw||10; mh.value=c.mh||6;
+  bri.value=c.bri; briVal.textContent='('+c.bri+')';
+  gamma.value=c.gamma; sled.value=c.sled??2; sledh.checked=c.sledh!==false;
+  chip.value=c.chip||'WS2812B'; fx.value=String(c.fx??1);
+  applyFxConfig(c);
+  aen.checked=!!c.aen; sen.checked=!!c.sen && !c.aen;
+  if (aen.checked && sen.checked) sen.checked = false;
+  universe.value = (c.aun != null ? c.aun : c.sun) ?? 0;
+  syncCtlModVisibility();
+  mw.value=c.mw||10; mh.value=c.mh||6; md.value=c.md||1; mdim.value=String(c.mdim??0);
+  mlay.value=String(c.mlay??0); mfill.value=String(c.mfill??0); mopentb.checked=!!c.mopentb; mspc.value=fmt1(c.mspc??1);
   pove.checked=!!c.pove; povm.value=String(c.povm??1); poyl.value=String(c.poyl??1);
-  povrpm.value=c.povrpm??600; povspd.value=c.povspd??4; povrad.value=c.povrad??0.25; povpath.value=c.povpath??1;
+  povbl.value=c.povbl??2; povrpm.value=c.povrpm??600; povspd.value=fmt1(c.povspd??4);
+  povrad.value=fmt1(c.povrad??0.3); povpath.value=fmt1(c.povpath??1);
+  const sc = Math.max(1, Math.min(STRIP_MAX, +(c.scnt ?? 1) | 0));
+  scnt.value = String(sc);
+  let slens = Array.isArray(c.slens) ? c.slens.map(x => Math.max(1, +x | 0)) : [];
+  if (!slens.length) slens = [Math.max(1, +(c.count || 60) | 0)];
+  while (slens.length < sc) slens.push(30);
+  slens = slens.slice(0, sc);
+  let sgpios = Array.isArray(c.sgpios) ? c.sgpios.map(x => +x | 0) : [];
+  if (!sgpios.length) {
+    sgpios = [+(c.gpio ?? DEFAULT_STRIP_GPIOS[0]) | 0];
+    for (let i = 1; i < sc; i++) sgpios.push(DEFAULT_STRIP_GPIOS[i] ?? (16 + i));
+  }
+  while (sgpios.length < sc) sgpios.push(DEFAULT_STRIP_GPIOS[sgpios.length] ?? 16);
+  sgpios = sgpios.slice(0, sc);
+  count.value = String(slens.reduce((a, b) => a + b, 0));
+  gpio.value = String(sgpios[0]);
+  rebuildStripLenFields(slens, sgpios);
+  updateGates();
+  startPovAnim();
 }
+
+function mapSettingsSig(){
+  return [
+    mapLayout(), +mfill.value | 0, mopentb.checked ? 1 : 0,
+    +mw.value | 0, +mh.value | 0, +md.value | 0, +mdim.value | 0,
+    (+(+mspc.value) || 1).toFixed(1), +count.value | 0,
+  ].join('|');
+}
+
+function mapIsCurrent(){
+  return map.length > 0 && mapBuiltSig === mapSettingsSig();
+}
+
+function shapeLayoutName(){
+  return ['Grid', 'Circle', 'Sphere', 'Box', 'Cylinder', 'Dome', 'Pyramid', 'Custom'][mapLayout()] || 'Map';
+}
+
+/** Expand a unit-normalized map point into centered world coords for preview. */
+function mapNormToWorld(p, content){
+  const s = Math.max(content, 1e-6);
+  return {
+    x: ((p.x || 0) - 0.5) * s,
+    y: ((p.y || 0) - 0.5) * s,
+    z: ((p.z || 0) - 0.5) * s,
+  };
+}
+
+/**
+ * Points to draw on the Map tab — centered world coords so spacing / dimensions
+ * grow the shape. Unit-normalized storage is expanded back for display.
+ */
+function mapDisplayPoints(){
+  /* Built map (or wire/custom): expand unit coords using current spacing × size. */
+  if (wireMode || pove.checked || mapLayout() === 7 || mapIsCurrent()) {
+    const c = layoutContentSize();
+    const content = mapLayout() === 7
+      ? VIEW_WORLD
+      : Math.max(c.sx, c.sy, c.sz, c.sp, 1e-6);
+    return map.map((p) => {
+      const w = mapNormToWorld(p, content);
+      return { x: w.x, y: w.y, z: w.z, i: p.i, g: p.g };
+    });
+  }
+  /* Settings changed since Build — live world-space preview. */
+  const synth = fxSamplePoints();
+  return synth.map((p, i) => ({
+    x: p.x, y: p.y, z: p.z || 0,
+    i: (map[i] && (map[i].i | 0) < 65535) ? map[i].i : i,
+    g: map[i] ? (map[i].g | 0) : 0,
+  }));
+}
+
 async function loadMap(){
   const r = await fetch('/api/map');
   map = await r.json();
-  draw();
+  if (map.length && map.every(p => !p.g)) assignDefaultStripGroups();
+  mapBuiltSig = map.length ? mapSettingsSig() : '';
+  syncZLayerControl();
+  drawMap();
 }
-function draw(){
-  const cv=mapCanvas, ctx=cv.getContext('2d');
-  ctx.clearRect(0,0,cv.width,cv.height);
-  ctx.strokeStyle='#2a3530';
-  for(let x=0;x<cv.width;x+=32){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,cv.height);ctx.stroke()}
-  for(let y=0;y<cv.height;y+=32){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cv.width,y);ctx.stroke()}
-  map.forEach((p,i)=>{
-    const x=p.x*cv.width, y=(1-p.y)*cv.height;
-    ctx.fillStyle = p.g? '#ffb454' : '#3dffa8';
-    ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2); ctx.fill();
-    if(i%Math.max(1,Math.floor(map.length/12))===0){
-      ctx.fillStyle='#8aa093'; ctx.fillText(String(p.i), x+7, y-7);
+
+function isMap3d(){
+  const lay = mapLayout();
+  return +mdim.value === 1 || lay === 2 || lay === 3 || lay === 4 || lay === 5 || lay === 6;
+}
+
+/**
+ * Fixed world window for Map/Effects previews.
+ * Spacing must change on-screen size — auto-fitting to content cancels spacing.
+ * Layouts larger than this window extend toward (and past) the edges.
+ */
+const VIEW_WORLD = 12;
+
+function estimateCircleRadius(n, sp, fill){
+  if (n <= 1) return 0;
+  if (fill === 1) return sp * Math.sqrt(n / Math.PI);
+  // Concentric rings: walk rings until n pixels placed
+  let left = n - 1;
+  let ring = 1;
+  let R = 0;
+  while (left > 0 && ring < 4096) {
+    R = ring * sp;
+    let on = Math.max(6, Math.round(2 * Math.PI * R / sp));
+    if (on > left) on = left;
+    left -= on;
+    ring++;
+  }
+  return R;
+}
+
+function estimateSphereRadius(n, sp){
+  if (n <= 1) return 0;
+  return sp * Math.cbrt(n * 3 / (4 * Math.PI));
+}
+
+function estimateCylinderSize(n, sp, openTb){
+  let wallN = openTb ? n : ((n * 2) / 3) | 0;
+  if (wallN < 8) wallN = n;
+  if (wallN > n) wallN = n;
+  let rings = Math.max(2, Math.round(Math.sqrt(wallN / 6)));
+  let circ = Math.max(6, (wallN / rings) | 0);
+  while (rings * circ > wallN && rings > 2) rings--;
+  let radius = (circ * sp) / (2 * Math.PI);
+  if (radius < sp) radius = sp;
+  const height = rings > 1 ? (rings - 1) * sp : sp;
+  return { radius, height };
+}
+
+function estimatePyramidEdge(n){
+  let edge = Math.max(3, Math.round(Math.sqrt(n / 5)));
+  const cap = (e) => {
+    if (e < 2) return 1;
+    let c = 4 * (e - 1) * 2;
+    const rows = Math.max(2, e);
+    for (let r = 1; r < rows; r++) c += 4 * Math.max(1, e - ((r * (e - 1)) / rows) | 0);
+    return c;
+  };
+  while (cap(edge) < n && edge < 256) edge++;
+  return edge;
+}
+
+function layoutContentSize(){
+  const sp = Math.max(0.1, +mspc.value || 1);
+  const lay = mapLayout();
+  const W = Math.max(1, +mw.value | 0), H = Math.max(1, +mh.value | 0);
+  const D = Math.max(1, +md.value | 0);
+  const diamR = (d) => (d < 2 ? 0 : 0.5 * (d - 1) * sp);
+  if (lay === 1) {
+    const R = diamR(W);
+    return { sx: R * 2, sy: R * 2, sz: 0, sp, R };
+  }
+  if (lay === 2 || lay === 5) {
+    const R = Math.max(sp * 0.5, diamR(W));
+    return { sx: R * 2, sy: lay === 5 ? R : R * 2, sz: R * 2, sp, R };
+  }
+  if (lay === 4) {
+    const radius = Math.max(sp, diamR(W));
+    const height = Math.max(0, H - 1) * sp;
+    return { sx: radius * 2, sy: height, sz: radius * 2, sp };
+  }
+  if (lay === 6) {
+    return {
+      sx: Math.max(0, W - 1) * sp,
+      sy: Math.max(0, H - 1) * sp,
+      sz: Math.max(0, W - 1) * sp,
+      sp,
+    };
+  }
+  return {
+    sx: Math.max(0, W - 1) * sp,
+    sy: Math.max(0, H - 1) * sp,
+    sz: (lay === 0 && +mdim.value !== 1) ? 0 : Math.max(0, D - 1) * sp,
+    sp, W, H, D
+  };
+}
+
+function viewExtent(){
+  return VIEW_WORLD;
+}
+
+function layoutExceedsView(){
+  const c = layoutContentSize();
+  const content = Math.max(c.sx, c.sy, c.sz, c.sp, 1e-6);
+  return content > VIEW_WORLD * 0.98;
+}
+
+/**
+ * Camera for Map/Effects previews: fixed world window, recentered on the
+ * model's AABB so the shape always sits in the middle of the viewport.
+ */
+function previewCamFromPoints(pts){
+  const vs = Math.max(viewExtent(), 1e-6);
+  if (!pts || !pts.length) return { cx: 0, cy: 0, cz: 0, vs };
+  let minx = Infinity, maxx = -Infinity;
+  let miny = Infinity, maxy = -Infinity;
+  let minz = Infinity, maxz = -Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const x = p.x || 0, y = p.y || 0, z = p.z || 0;
+    if (x < minx) minx = x; if (x > maxx) maxx = x;
+    if (y < miny) miny = y; if (y > maxy) maxy = y;
+    if (z < minz) minz = z; if (z > maxz) maxz = z;
+  }
+  return {
+    cx: (minx + maxx) * 0.5,
+    cy: (miny + maxy) * 0.5,
+    cz: (minz + maxz) * 0.5,
+    vs,
+  };
+}
+
+/** World point → view space (0..1); model center maps to viewport center. */
+function toViewUnit(p, cam){
+  const c = cam || { cx: 0, cy: 0, cz: 0, vs: viewExtent() };
+  const vs = Math.max(c.vs, 1e-6);
+  return {
+    x: ((p.x || 0) - c.cx) / vs + 0.5,
+    y: ((p.y || 0) - c.cy) / vs + 0.5,
+    z: ((p.z || 0) - c.cz) / vs + 0.5,
+  };
+}
+
+/** World point → unit coords for effect evaluation (0.5 = center). */
+function worldToEffectNorm(p){
+  const c = layoutContentSize();
+  const content = Math.max(c.sx, c.sy, c.sz, c.sp, 1e-6);
+  return {
+    x: (p.x || 0) / content + 0.5,
+    y: (p.y || 0) / content + 0.5,
+    z: (p.z || 0) / content + 0.5,
+  };
+}
+
+/**
+ * Match canvas buffer to CSS box so letterboxing is not re-stretched.
+ * (width:100% + fixed height otherwise turns circles into ellipses.)
+ */
+function syncCanvasBuffer(cv){
+  if (!cv) return { w: 1, h: 1 };
+  const w = Math.max(1, cv.clientWidth | 0);
+  const h = Math.max(1, cv.clientHeight | 0);
+  if (cv.width !== w || cv.height !== h) {
+    cv.width = w;
+    cv.height = h;
+  }
+  return { w, h };
+}
+
+/** Map 0..1 view coords onto a square letterboxed region (keeps circles round). */
+function viewToCanvasXY(v, w, h){
+  const side = Math.min(w, h);
+  const ox = (w - side) * 0.5;
+  const oy = (h - side) * 0.5;
+  return {
+    x: ox + (v.x || 0) * side,
+    y: oy + (1 - (v.y || 0)) * side,
+    side, ox, oy,
+  };
+}
+function canvasToViewXY(px, py, w, h){
+  const side = Math.min(w, h);
+  const ox = (w - side) * 0.5;
+  const oy = (h - side) * 0.5;
+  return {
+    x: (px - ox) / side,
+    y: 1 - (py - oy) / side,
+  };
+}
+
+/** Axis-aligned content box in the same view space as toViewUnit (not a unit cube). */
+function layoutBoundsView(){
+  const c = layoutContentSize();
+  const vs = Math.max(viewExtent(), 1e-6);
+  const hx = (c.sx * 0.5) / vs;
+  const hy = (c.sy * 0.5) / vs;
+  const hz = (c.sz * 0.5) / vs;
+  return {
+    x0: 0.5 - hx, x1: 0.5 + hx,
+    y0: 0.5 - hy, y1: 0.5 + hy,
+    z0: 0.5 - hz, z1: 0.5 + hz,
+  };
+}
+
+/** Prefer plotted-pixel extents so the box matches what is drawn. */
+function mapBoundsView(pts, cam){
+  const points = pts || mapDisplayPoints();
+  if (!points.length) return layoutBoundsView();
+  const c = cam || previewCamFromPoints(points);
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (let i = 0; i < points.length; i++) {
+    const v = toViewUnit(points[i], c);
+    const z = v.z || 0;
+    if (v.x < x0) x0 = v.x; if (v.x > x1) x1 = v.x;
+    if (v.y < y0) y0 = v.y; if (v.y > y1) y1 = v.y;
+    if (z < z0) z0 = z; if (z > z1) z1 = z;
+  }
+  const lb = layoutBoundsView();
+  if (!(x1 > x0)) { x0 = lb.x0; x1 = lb.x1; }
+  if (!(y1 > y0)) { y0 = lb.y0; y1 = lb.y1; }
+  if (!(z1 > z0)) { z0 = lb.z0; z1 = lb.z1; }
+  /* Keep the bounds frame centered even if the AABB is slightly asymmetric. */
+  const mx = (x0 + x1) * 0.5, my = (y0 + y1) * 0.5, mz = (z0 + z1) * 0.5;
+  const hx = Math.max(mx - x0, x1 - mx);
+  const hy = Math.max(my - y0, y1 - my);
+  const hz = Math.max(mz - z0, z1 - mz);
+  return {
+    x0: 0.5 - hx, x1: 0.5 + hx,
+    y0: 0.5 - hy, y1: 0.5 + hy,
+    z0: 0.5 - hz, z1: 0.5 + hz,
+  };
+}
+
+function layerZTarget(){
+  const depth = Math.max(1, +md.value || 1);
+  if (depth <= 1) return 0;
+  return (+mapZLayer.value) / (depth - 1);
+}
+
+function onEditLayer(p){
+  /* Z-layer editing for solid lattices only (p is world-centered). */
+  const lay = mapLayout();
+  const solidLattice = lay === 0 || (lay === 3 && (+mfill.value | 0) === 1);
+  if (!solidLattice || !isMap3d()) return true;
+  const depth = Math.max(1, +md.value || 1);
+  if (depth <= 1) return true;
+  const sp = Math.max(0.1, +mspc.value || 1);
+  const zIdx = Math.round((p.z || 0) / sp + (depth - 1) * 0.5);
+  return zIdx === (+mapZLayer.value | 0);
+}
+
+function clampOrbitPitch(p){
+  return Math.max(-ORBIT_PITCH_MAX, Math.min(ORBIT_PITCH_MAX, p));
+}
+
+function projectPoint(x, y, z, yaw, pitch, zoom, w, h){
+  // Map coords 0..1 → centered cube (Y up)
+  const px = x - 0.5, py = y - 0.5, pz = (z || 0) - 0.5;
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  // Invert pitch so +elevation = look down from above
+  const cp = Math.cos(-pitch), sp = Math.sin(-pitch);
+  // Yaw around Y
+  const x1 = px * cy + pz * sy;
+  const z1 = -px * sy + pz * cy;
+  const y1 = py;
+  // Pitch around X
+  const y2 = y1 * cp - z1 * sp;
+  const z2 = y1 * sp + z1 * cp;
+  const dist = 2.7 / Math.max(0.35, zoom);
+  const s = 300 / (dist + z2 + 1.35);
+  return {
+    sx: w * 0.5 + x1 * s,
+    sy: h * 0.5 - y2 * s,
+    depth: z2,
+    scale: Math.max(2.2, Math.min(7, 4.5 * (s / 200)))
+  };
+}
+
+function drawAxesBox(ctx, yaw, pitch, zoom, w, h, bounds){
+  const b = bounds || mapBoundsView();
+  const xs = [b.x0, b.x1], ys = [b.y0, b.y1], zs = [b.z0, b.z1];
+  const corners = [];
+  for (let zi = 0; zi < 2; zi++)
+    for (let yi = 0; yi < 2; yi++)
+      for (let xi = 0; xi < 2; xi++)
+        corners.push(projectPoint(xs[xi], ys[yi], zs[zi], yaw, pitch, zoom, w, h));
+
+  const edges = [[0,1],[0,2],[0,4],[1,3],[1,5],[2,3],[2,6],[3,7],[4,5],[4,6],[5,7],[6,7]];
+  ctx.strokeStyle = '#1e2a24';
+  ctx.lineWidth = 1;
+  edges.forEach(([a,b])=>{
+    ctx.beginPath();
+    ctx.moveTo(corners[a].sx, corners[a].sy);
+    ctx.lineTo(corners[b].sx, corners[b].sy);
+    ctx.stroke();
+  });
+
+  // Axis stubs from content origin corner
+  const dx = Math.max(1e-4, b.x1 - b.x0);
+  const dy = Math.max(1e-4, b.y1 - b.y0);
+  const dz = Math.max(1e-4, b.z1 - b.z0);
+  const o = projectPoint(b.x0, b.y0, b.z0, yaw, pitch, zoom, w, h);
+  const ax = projectPoint(b.x0 + dx * 0.28, b.y0, b.z0, yaw, pitch, zoom, w, h);
+  const ay = projectPoint(b.x0, b.y0 + dy * 0.28, b.z0, yaw, pitch, zoom, w, h);
+  const az = projectPoint(b.x0, b.y0, b.z0 + dz * 0.28, yaw, pitch, zoom, w, h);
+  const drawAxis = (p, color, label)=>{
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(o.sx, o.sy); ctx.lineTo(p.sx, p.sy); ctx.stroke();
+    ctx.font = '12px sans-serif'; ctx.fillText(label, p.sx + 4, p.sy - 2);
+  };
+  drawAxis(ax, '#3dffa8', 'X');
+  drawAxis(ay, '#ffb454', 'Y');
+  drawAxis(az, '#7eb6ff', 'Z');
+}
+
+function drawMapGrid(){
+  const cv = mapCanvas, ctx = cv.getContext('2d');
+  const { w, h } = syncCanvasBuffer(cv);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0a0e0c';
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = '#1c2621';
+  for (let x = 0; x < w; x += 32) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  for (let y = 0; y < h; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+  const vs = viewExtent();
+  const display = mapDisplayPoints();
+  const cam = previewCamFromPoints(display);
+  const b = mapBoundsView(display, cam);
+  const p0 = viewToCanvasXY({ x: b.x0, y: b.y1 }, w, h);
+  const p1 = viewToCanvasXY({ x: b.x1, y: b.y0 }, w, h);
+  ctx.strokeStyle = '#2a3530';
+  ctx.strokeRect(p0.x, p0.y, Math.max(1, p1.x - p0.x), Math.max(1, p1.y - p0.y));
+  mapProj = [];
+  display.forEach((p, i)=>{
+    const v = toViewUnit(p, cam);
+    const { x, y } = viewToCanvasXY(v, w, h);
+    mapProj[i] = { sx: x, sy: y, depth: 0, scale: 5 };
+    const unassigned = (p.i | 0) >= 65535;
+    const sg = Math.max(0, (p.g | 0) - 1);
+    ctx.fillStyle = unassigned ? '#3a4540' : (STRIP_COLORS[sg % STRIP_COLORS.length] || '#3dffa8');
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+    if (!wireMode && i % Math.max(1, Math.floor(display.length / 12)) === 0) {
+      ctx.fillStyle = '#8aa093'; ctx.fillText(String(p.i), x + 7, y - 7);
     }
   });
+  if (wireMode) drawWirePath(ctx);
+  ctx.fillStyle = '#8aa093';
+  ctx.font = '12px sans-serif';
+  const stale = !mapIsCurrent() && mapLayout() !== 7 ? ' · preview (Build to apply)' : '';
+  const clip = layoutExceedsView() ? ' · larger than view' : '';
+  ctx.fillText(shapeLayoutName() + ' · spacing ' + fmt1(mspc.value) + ' · view ' + fmt1(vs) + stale + clip, 12, 18);
 }
-function hit(mx,my){
-  for(let i=0;i<map.length;i++){
-    const x=map[i].x*mapCanvas.width, y=(1-map[i].y)*mapCanvas.height;
-    if((x-mx)**2+(y-my)**2 < 100) return i;
+
+function drawMap3d(ts){
+  const cv = mapCanvas, ctx = cv.getContext('2d');
+  const { w, h } = syncCanvasBuffer(cv);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0a0e0c';
+  ctx.fillRect(0, 0, w, h);
+
+  if (map3dAuto.checked && !mapOrbit.dragging && drag < 0) {
+    const last = drawMap3d._lastTs || ts || 0;
+    const dt = Math.min(48, Math.max(0, (ts || 0) - last));
+    drawMap3d._lastTs = ts || 0;
+    mapOrbit.yaw += dt * 0.0004;
+  } else {
+    drawMap3d._lastTs = ts || 0;
   }
-  return -1;
+  const yaw = mapOrbit.yaw, pitch = mapOrbit.pitch, zoom = mapOrbit.zoom;
+  const display = mapDisplayPoints();
+  const cam = previewCamFromPoints(display);
+  drawAxesBox(ctx, yaw, pitch, zoom, w, h, mapBoundsView(display, cam));
+
+  const projOf = (p) => {
+    const v = toViewUnit(p, cam);
+    return projectPoint(v.x, v.y, v.z, yaw, pitch, zoom, w, h);
+  };
+
+  // Grid neighbor links when map matches full W×H×D
+  const W = Math.max(1, +mw.value | 0), H = Math.max(1, +mh.value | 0), D = Math.max(1, +md.value | 0);
+  if (mapLayout() === 0 && display.length === W * H * D) {
+    ctx.strokeStyle = 'rgba(61,255,168,0.14)';
+    ctx.lineWidth = 1;
+    const idx = (x, y, z) => z * H * W + y * W + x;
+    const link = (i, j) => {
+      const a = projOf(display[i]), b = projOf(display[j]);
+      ctx.beginPath(); ctx.moveTo(a.sx, a.sy); ctx.lineTo(b.sx, b.sy); ctx.stroke();
+    };
+    for (let z = 0; z < D; z++) {
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const i = idx(x, y, z);
+          if (x + 1 < W) link(i, idx(x + 1, y, z));
+          if (y + 1 < H) link(i, idx(x, y + 1, z));
+          if (z + 1 < D) link(i, idx(x, y, z + 1));
+        }
+      }
+    }
+  }
+
+  const pts = display.map((p, i)=>{
+    const pr = projOf(p);
+    return { i, p, pr, edit: onEditLayer(p) };
+  }).sort((a, b)=> a.pr.depth - b.pr.depth);
+
+  mapProj = new Array(display.length);
+  pts.forEach(({ i, p, pr, edit })=>{
+    mapProj[i] = pr;
+    const zn = worldToEffectNorm(p).z;
+    const unassigned = (p.i | 0) >= 65535;
+    const sg = Math.max(0, (p.g | 0) - 1);
+    let fill;
+    if (unassigned) fill = 'rgba(80,90,85,0.65)';
+    else if (wireMode) fill = STRIP_COLORS[sg % STRIP_COLORS.length];
+    else if (edit) fill = STRIP_COLORS[sg % STRIP_COLORS.length];
+    else {
+      const r = 90 + zn * 120 | 0, g = 140 + (1 - zn) * 70 | 0, b = 170;
+      fill = `rgba(${r},${g},${b},0.78)`;
+    }
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(pr.sx, pr.sy, edit || wireMode ? pr.scale + 0.8 : pr.scale * 0.85, 0, Math.PI * 2);
+    ctx.fill();
+    if (!wireMode && edit && (i % Math.max(1, Math.floor(display.length / 20)) === 0)) {
+      ctx.fillStyle = '#c5d4c9';
+      ctx.fillText(String(p.i), pr.sx + 6, pr.sy - 6);
+    }
+  });
+  if (wireMode) drawWirePath(ctx);
+
+  const lay = mapLayout();
+  let label = shapeLayoutName() + ' · ' + display.length + ' px';
+  if (lay === 0 || lay === 3) label = shapeLayoutName() + ' · ' + (+mw.value) + '×' + (+mh.value) + '×' + (+md.value);
+  if (!mapIsCurrent() && lay !== 7) label += ' · preview (Build to apply)';
+  if (layoutExceedsView()) label += ' · larger than view';
+  ctx.fillStyle = '#8aa093';
+  ctx.font = '12px sans-serif';
+  ctx.fillText(label + ' · spacing ' + fmt1(mspc.value), 12, 20);
+
+  if (isMap3d() && !pove.checked && map3dAuto.checked) {
+    mapRaf = requestAnimationFrame(drawMap3d);
+  }
 }
+
+function drawMap(){
+  if (isMap3d() && !pove.checked) drawMap3d(performance.now());
+  else drawMapGrid();
+}
+
+function startMapAnim(){
+  cancelAnimationFrame(mapRaf);
+  if (isMap3d() && !pove.checked) mapRaf = requestAnimationFrame(drawMap3d);
+  else drawMap();
+}
+
+function canvasXY(e){
+  const r = mapCanvas.getBoundingClientRect();
+  const { w, h } = syncCanvasBuffer(mapCanvas);
+  return {
+    x: (e.clientX - r.left) * (w / r.width),
+    y: (e.clientY - r.top) * (h / r.height)
+  };
+}
+
+function hit(mx, my){
+  /* Preview geometry (settings ≠ built map) is display-only */
+  if (!wireMode && !mapIsCurrent() && mapLayout() !== 7) return -1;
+  let best = -1, bestD = 120;
+  for (let i = 0; i < map.length; i++) {
+    if (!wireMode && isMap3d() && !onEditLayer(map[i])) continue;
+    const pr = mapProj[i];
+    if (!pr) continue;
+    const d = (pr.sx - mx) ** 2 + (pr.sy - my) ** 2;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+function wireClick(mi){
+  if (mi < 0) return;
+  const si = +routeStrip.value | 0;
+  const need = stripLengths()[si] || 0;
+  const existing = wireRoute.indexOf(mi);
+  if (existing >= 0) {
+    // Clicking an already-routed pixel truncates the path to that point
+    wireRoute = wireRoute.slice(0, existing + 1);
+  } else {
+    if (wireRoute.length >= need) return;
+    // Don't steal a pixel already owned by another strip's finished address
+    const p = map[mi];
+    const addr = p.i | 0;
+    const base = stripBase(si);
+    if (addr < 65535 && (addr < base || addr >= base + need) && (p.g | 0) > 0 && (p.g | 0) !== si + 1) {
+      setStatus(mapStatus, false, 'That pixel is assigned to Strip ' + (p.g | 0) + '. Clear that strip first or pick another.');
+      return;
+    }
+    wireRoute.push(mi);
+  }
+  applyWireAssignment(si);
+  updateWireProgress();
+  drawMap();
+  if (wireRoute.length >= need) {
+    setStatus(mapStatus, true, 'Strip ' + (si + 1) + ' wire order complete (' + need + ' LEDs).');
+  }
+}
+
+bri.addEventListener('input',()=>{briVal.textContent='('+bri.value+')'});
+['pove','povm','poyl','povbl','povrpm','povspd','povrad','povpath','mdim','mlay','mfill','mspc','mopentb'].forEach(id=>{
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input',()=>{
+    updateGates();
+    startPovAnim();
+    if (fxTabActive) startFxAnim();
+    else drawMap();
+  });
+  el.addEventListener('change',()=>{
+    if (id === 'mspc' || id === 'povspd' || id === 'povrad' || id === 'povpath') el.value = fmt1(el.value);
+    updateGates();
+    startPovAnim();
+    if (fxTabActive) startFxAnim();
+    else drawMap();
+  });
+});
+['mw','mh','md'].forEach(id=>{
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input',()=>{syncMapBudget(); syncZLayerControl(); if (fxTabActive) startFxAnim(); else drawMap();});
+  el.addEventListener('change',()=>{syncMapBudget(); syncZLayerControl(); if (fxTabActive) startFxAnim(); else drawMap();});
+});
+scnt.addEventListener('input',()=>{
+  const lens = stripLengths();
+  const gpios = stripGpios();
+  const n = stripCount();
+  while (lens.length < n) lens.push(30);
+  while (gpios.length < n) gpios.push(DEFAULT_STRIP_GPIOS[gpios.length] ?? 16);
+  rebuildStripLenFields(lens.slice(0, n), gpios.slice(0, n));
+  syncMapBudget();
+  if (wireMode) setWireMode(false);
+});
+scnt.addEventListener('change',()=>{ scnt.dispatchEvent(new Event('input')); });
+sled.addEventListener('input', syncStripGpioWarn);
+sled.addEventListener('change', syncStripGpioWarn);
+routeStrip.addEventListener('change',()=>{
+  if (wireMode) {
+    beginWireRouteForStrip(+routeStrip.value | 0);
+    setStatus(mapStatus, true, 'Now routing Strip ' + ((+routeStrip.value | 0) + 1) + '.');
+  }
+  updateWireProgress();
+  drawMap();
+});
+wireOrderBtn.onclick=()=> setWireMode(!wireMode);
+wireOrderUndo.onclick=()=>{
+  if (!wireMode || !wireRoute.length) return;
+  wireRoute.pop();
+  applyWireAssignment(+routeStrip.value | 0);
+  updateWireProgress();
+  drawMap();
+};
+wireOrderClear.onclick=()=>{
+  if (!wireMode) return;
+  clearStripRoute(+routeStrip.value | 0);
+  updateWireProgress();
+  drawMap();
+  setStatus(mapStatus, true, 'Cleared wire order for Strip ' + ((+routeStrip.value | 0) + 1) + '.');
+};
+autoRouteApply.onclick=()=> applyAutoRoute();
+mapZLayer.addEventListener('input',()=>{syncZLayerControl(); drawMap();});
+map3dAuto.addEventListener('change',()=>startMapAnim());
+map3dReset.onclick=()=>{
+  mapOrbit = { ...DEFAULT_MAP_ORBIT, dragging: false, lastX: 0, lastY: 0 };
+  startMapAnim();
+};
+fx3dAuto.addEventListener('change',()=>{ if (fxTabActive) startFxAnim(); });
+fx3dReset.onclick=()=>{
+  fxOrbit = { ...DEFAULT_FX_ORBIT, dragging: false, lastX: 0, lastY: 0 };
+  if (fxTabActive) startFxAnim();
+};
+
 mapCanvas.onpointerdown=e=>{
-  const r=mapCanvas.getBoundingClientRect();
-  const mx=(e.clientX-r.left)*(mapCanvas.width/r.width);
-  const my=(e.clientY-r.top)*(mapCanvas.height/r.height);
-  drag=hit(mx,my); mapCanvas.setPointerCapture(e.pointerId);
+  if (pove.checked) return;
+  const {x,y} = canvasXY(e);
+  const hi = hit(x, y);
+  if (wireMode) {
+    if (hi >= 0) wireClick(hi);
+    else if (isMap3d()) {
+      mapOrbit.dragging = true;
+      mapOrbit.lastX = e.clientX;
+      mapOrbit.lastY = e.clientY;
+    }
+    mapCanvas.setPointerCapture(e.pointerId);
+    return;
+  }
+  drag = hi;
+  if (drag < 0 && isMap3d()) {
+    mapOrbit.dragging = true;
+    mapOrbit.lastX = e.clientX;
+    mapOrbit.lastY = e.clientY;
+  }
+  mapCanvas.setPointerCapture(e.pointerId);
 };
 mapCanvas.onpointermove=e=>{
-  if(drag<0) return;
-  const r=mapCanvas.getBoundingClientRect();
-  map[drag].x=Math.min(1,Math.max(0,(e.clientX-r.left)*(mapCanvas.width/r.width)/mapCanvas.width));
-  map[drag].y=Math.min(1,Math.max(0,1-(e.clientY-r.top)*(mapCanvas.height/r.height)/mapCanvas.height));
-  draw();
+  if (pove.checked) return;
+  if (!wireMode && drag >= 0) {
+    const {x,y} = canvasXY(e);
+    if (isMap3d()) {
+      const dx = e.movementX / mapCanvas.clientWidth;
+      const dy = e.movementY / mapCanvas.clientHeight;
+      const cy = Math.cos(mapOrbit.yaw), sy = Math.sin(mapOrbit.yaw);
+      map[drag].x = Math.min(1, Math.max(0, map[drag].x + dx * cy - dy * sy * 0.35));
+      map[drag].y = Math.min(1, Math.max(0, map[drag].y - dy * 0.9));
+    } else {
+      const c = layoutContentSize();
+      const content = Math.max(c.sx, c.sy, c.sz, c.sp, 1e-6);
+      const cam = previewCamFromPoints(mapDisplayPoints());
+      const vv = canvasToViewXY(x, y, mapCanvas.width, mapCanvas.height);
+      const wx = (vv.x - 0.5) * cam.vs + cam.cx;
+      const wy = (vv.y - 0.5) * cam.vs + cam.cy;
+      map[drag].x = Math.min(1, Math.max(0, wx / content + 0.5));
+      map[drag].y = Math.min(1, Math.max(0, wy / content + 0.5));
+    }
+    if (!map3dAuto.checked || !isMap3d()) drawMap();
+    return;
+  }
+  if (mapOrbit.dragging && isMap3d()) {
+    mapOrbit.yaw += (e.clientX - mapOrbit.lastX) * 0.008;
+    // Drag up → higher elevation (more from above)
+    mapOrbit.pitch = clampOrbitPitch(mapOrbit.pitch - (e.clientY - mapOrbit.lastY) * 0.01);
+    mapOrbit.lastX = e.clientX;
+    mapOrbit.lastY = e.clientY;
+    if (!map3dAuto.checked) drawMap();
+  }
 };
-mapCanvas.onpointerup=()=>{drag=-1};
+mapCanvas.onpointerup=()=>{ drag = -1; mapOrbit.dragging = false; };
+mapCanvas.onpointercancel=()=>{ drag = -1; mapOrbit.dragging = false; };
+mapCanvas.onwheel=e=>{
+  if (!isMap3d() || pove.checked) return;
+  e.preventDefault();
+  mapOrbit.zoom = Math.max(0.2, Math.min(2.8, mapOrbit.zoom * (e.deltaY > 0 ? 0.92 : 1.08)));
+  if (!map3dAuto.checked) drawMap();
+};
 mapCanvas.ondblclick=e=>{
-  const r=mapCanvas.getBoundingClientRect();
-  const i=hit((e.clientX-r.left)*(mapCanvas.width/r.width),(e.clientY-r.top)*(mapCanvas.height/r.height));
-  if(i>=0){ map[i].g = map[i].g?0:1; draw(); }
+  if (pove.checked || wireMode || stripCount() > 1) return;
+  const {x,y} = canvasXY(e);
+  const i = hit(x, y);
+  if (i >= 0) { map[i].g = map[i].g ? 0 : 1; drawMap(); }
 };
-saveCfg.onclick=async()=>{
-  const body={
-    ssid:ssid.value, pass:pass.value, host:host.value,
-    gpio:+gpio.value, sled:+sled.value, sledh:sledh.checked,
-    count:+count.value, bri:+bri.value, gamma:+gamma.value,
-    chip:chip.value, fx:+fx.value, speed:+speed.value,
-    aun:+aun.value, sun:+sun.value, aen:aen.checked, sen:sen.checked,
-    mw:+mw.value, mh:+mh.value,
-    pove:pove.checked, povm:+povm.value, poyl:+poyl.value,
-    povrpm:+povrpm.value, povspd:+povspd.value, povrad:+povrad.value, povpath:+povpath.value
+
+/* —— Effect preview (matches firmware spatial eval) —— */
+function hsvToRgb(h, s, v){
+  // Matches components/color/src/color_engine.c pm_hsv_to_rgb
+  h = h & 255; s = Math.max(0, Math.min(255, s|0)); v = Math.max(0, Math.min(255, v|0));
+  if (s === 0) return [v, v, v];
+  const region = (h / 43) | 0;
+  const rem = ((h - region * 43) * 6) & 255;
+  const scale8 = (a, b) => ((a * b) / 255) | 0;
+  const p = scale8(v, 255 - s);
+  const q = scale8(v, 255 - scale8(s, rem));
+  const t = scale8(v, 255 - scale8(s, 255 - rem));
+  switch (region) {
+    case 0: return [v, t, p];
+    case 1: return [q, v, p];
+    case 2: return [p, v, t];
+    case 3: return [p, q, v];
+    case 4: return [t, p, v];
+    default: return [v, p, q];
+  }
+}
+
+function hash2(x, y){
+  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return n - Math.floor(n);
+}
+function noise2(x, y){
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+
+function fract(v){ return v - Math.floor(v); }
+function clamp01(v){ return Math.max(0, Math.min(1, v)); }
+function smoothpulse(x, width){
+  const d = Math.abs(x);
+  if (d >= width) return 0;
+  const u = 1 - d / width;
+  return u * u * (3 - 2 * u);
+}
+
+/** Off/dark voxels stay see-through so lit pixels behind them remain visible. */
+function fxFillStyle(r, g, b){
+  const lum = Math.max(r, g, b) / 255;
+  const a = 0.06 + Math.pow(lum, 0.75) * 0.94;
+  return `rgba(${r|0},${g|0},${b|0},${a.toFixed(3)})`;
+}
+
+/* —— Custom Lua preview (mirrors firmware helpers) —— */
+let _luaFn = null;
+let _luaSrc = '';
+let _luaErr = '';
+
+function luaHelpers(){
+  const hsv = (h, s, v) => ({ t: 'hsv', h: h|0, s: s|0, v: v|0 });
+  const rgb = (r, g, b) => ({ t: 'rgb', r: r|0, g: g|0, b: b|0 });
+  const lerp = (a, b, u) => a + (b - a) * u;
+  const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
+  const length = (...a) => Math.sqrt(a.reduce((s, v) => s + v * v, 0));
+  const dist = (ax, ay, az = 0, bx, by, bz) => {
+    if (bx === undefined) return length(ax, ay, az);
+    return length(ax - bx, ay - by, az - (bz || 0));
   };
-  const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  cfgStatus.textContent = r.ok ? 'Saved. Reboot if WiFi/GPIO changed.' : 'Save failed';
-  cfgStatus.className='status '+(r.ok?'ok':'');
+  return {
+    hsv, rgb, lerp, clamp, length, dist,
+    noise2, noise3: (x, y, z) => noise2(x + z * 0.31, y - z * 0.17),
+    sin: Math.sin, cos: Math.cos, abs: Math.abs, floor: Math.floor,
+    fract, atan2: Math.atan2,
+  };
+}
+
+function luaBodyToJs(src){
+  let s = String(src || '').replace(/\r\n/g, '\n');
+  s = s.replace(/--\[\[[\s\S]*?\]\]/g, '');
+  s = s.replace(/--[^\n]*/g, '');
+  s = s.replace(/\blocal\b/g, 'let');
+  s = s.replace(/~=/g, '!==');
+  s = s.replace(/\band\b/g, '&&');
+  s = s.replace(/\bor\b/g, '||');
+  // standalone not (avoid touching identifiers)
+  s = s.replace(/\bnot\b/g, '!');
+  // if cond then → if (cond) {
+  s = s.replace(/\bif\b\s+/g, 'if (');
+  s = s.replace(/\bthen\b/g, ') {');
+  s = s.replace(/\belseif\b\s+/g, '} else if (');
+  s = s.replace(/\belse\b/g, '} else {');
+  s = s.replace(/\bwhile\b\s+/g, 'while (');
+  s = s.replace(/\bdo\b/g, ') {');
+  s = s.replace(/\bend\b/g, '}');
+  // for i=a,b,c do already became for i=a,b,c ) { — fix numeric for
+  s = s.replace(/for\s*\(\s*([A-Za-z_]\w*)\s*=\s*([^,]+),\s*([^,)\s]+)(?:,\s*([^)\s]+))?\s*\)\s*\{/g,
+    (_, i, a, b, c) => {
+      const step = c || '1';
+      return `for (let ${i}=${a}; (${step}>0?${i}<=${b}:${i}>=${b}); ${i}+=(${step})) {`;
+    });
+  return s;
+}
+
+function compileLuaPreview(src){
+  const body = luaBodyToJs(src);
+  const h = luaHelpers();
+  const names = Object.keys(h);
+  const fn = new Function(
+    ...names,
+    't', 'speed', 'scale', 'intensity', 'i', 'count', 'x', 'y', 'z',
+    'ph', 'ps', 'pv', 'sh', 'ss', 'sv',
+    'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p',
+    `"use strict";\n${body}\nreturn {t:'rgb',r:0,g:0,b:0};`
+  );
+  return { fn, helpers: h };
+}
+
+function ensureLuaPreview(){
+  const el = document.getElementById('fxLua');
+  const src = el ? el.value : '';
+  if (_luaFn && src === _luaSrc) return true;
+  try {
+    const { fn, helpers } = compileLuaPreview(src);
+    const vals = Object.keys(helpers).map(n => helpers[n]);
+    const bound = fn.bind(null, ...vals);
+    _luaFn = (args) => bound(
+      args.t, args.speed, args.scale, args.intensity, args.i, args.count,
+      args.x, args.y, args.z, args.ph, args.ps, args.pv, args.sh, args.ss, args.sv,
+      args.p1, args.p2, args.p3, args.p4, args.p5, args.p6, args.p7, args.p8, args.p
+    );
+    _luaSrc = src;
+    _luaErr = '';
+    return true;
+  } catch (e) {
+    _luaFn = null;
+    _luaSrc = src;
+    _luaErr = String(e.message || e);
+    return false;
+  }
+}
+
+function evalLuaPreview(x, y, z, tSec, inten, idx, count){
+  if (!ensureLuaPreview() || !_luaFn) return [0, 0, 0];
+  try {
+    const st = fxActiveState();
+    const p = st.fxp.map(v => (v | 0) / 255);
+    const out = _luaFn({
+      t: tSec,
+      speed: Math.max(0, +st.speed || 0),
+      scale: Math.max(0.1, +st.scale || 1),
+      intensity: inten,
+      i: idx|0, count: count|0, x, y, z,
+      ph: st.ph|0, ps: st.ps|0, pv: st.pv|0,
+      sh: st.sh|0, ss: st.ss|0, sv: st.sv|0,
+      p1: p[0], p2: p[1], p3: p[2], p4: p[3], p5: p[4], p6: p[5], p7: p[6], p8: p[7],
+      p: [null, ...p],
+    });
+    if (!out) return [0, 0, 0];
+    if (out.t === 'rgb') {
+      return [
+        Math.max(0, Math.min(255, (out.r * inten)|0)),
+        Math.max(0, Math.min(255, (out.g * inten)|0)),
+        Math.max(0, Math.min(255, (out.b * inten)|0)),
+      ];
+    }
+    return hsvToRgb(out.h|0, out.s|0, Math.max(0, Math.min(255, (out.v * inten)|0)));
+  } catch (e) {
+    _luaErr = String(e.message || e);
+    return [0, 0, 0];
+  }
+}
+
+function lerpU8(a, b, t){
+  t = clamp01(t);
+  return ((1 - t) * a + t * b) | 0;
+}
+function lerpHsv(a, b, t){
+  return { h: lerpU8(a.h, b.h, t), s: lerpU8(a.s, b.s, t), v: lerpU8(a.v, b.v, t) };
+}
+function applyFxGeom(x, y, z, st){
+  let px = x - 0.5, py = y - 0.5, pz = z - 0.5;
+  const pos = st.fxpos || [128, 128, 128];
+  const rot = st.fxrot || [0, 0, 0];
+  const rx = ((rot[0] | 0) / 255) * Math.PI * 2;
+  const ry = ((rot[1] | 0) / 255) * Math.PI * 2;
+  const rz = ((rot[2] | 0) / 255) * Math.PI * 2;
+  let cy = Math.cos(rx), sy = Math.sin(rx);
+  let y1 = py * cy - pz * sy;
+  let z1 = py * sy + pz * cy;
+  py = y1; pz = z1;
+  let cx = Math.cos(ry), sx = Math.sin(ry);
+  let x1 = px * cx + pz * sx;
+  z1 = -px * sx + pz * cx;
+  px = x1; pz = z1;
+  cx = Math.cos(rz); sx = Math.sin(rz);
+  x1 = px * cx - py * sx;
+  y1 = px * sx + py * cx;
+  px = x1; py = y1;
+  return {
+    x: px + 0.5 + ((pos[0] | 0) / 255) - 0.5,
+    y: py + 0.5 + ((pos[1] | 0) / 255) - 0.5,
+    z: pz + 0.5 + ((pos[2] | 0) / 255) - 0.5,
+  };
+}
+function evalEffect(id, x, y, z, tSec, inten, idx, count){
+  // Apply live (base + modulator) scale/intensity; inten arg ignored
+  const st = fxActiveState();
+  const g = applyFxGeom(x, y, z, st);
+  x = g.x; y = g.y; z = g.z;
+  const scale = Math.max(0.1, +st.scale || 1);
+  inten = Math.max(0, Math.min(1, (st.fxint | 0) / 255));
+  const p1 = (st.fxp[0] | 0) / 255;
+  const pat = 6;
+  const lineW = 0.08;
+  x *= scale; y *= scale; z *= scale;
+  if ((id|0) === 25) return evalLuaPreview(x / scale, y / scale, z / scale, tSec, inten, idx || 0, count || 1);
+  let c = { h: st.ph|0, s: st.ps|0, v: st.pv|0 };
+  const primary = { h: st.ph|0, s: st.ps|0, v: st.pv|0 };
+  const secondary = { h: st.sh|0, s: st.ss|0, v: st.sv|0 };
+  const cx = x - 0.5 * scale, cy = y - 0.5 * scale, cz = z - 0.5 * scale;
+  const t = tSec;
+  switch (id|0) {
+    case 0:
+      c = { h: primary.h, s: primary.s, v: (primary.v * inten) | 0 };
+      break;
+    case 1: {
+      const hv = x * 40 + y * 25 + z * 15 + t * 40;
+      c = { h: hv & 255, s: 255, v: (255 * inten) | 0 };
+      break;
+    }
+    case 2: { // plasma — primary↔secondary by field; p1 = complexity
+      const freq = 1.5 + p1 * 4;
+      let field = Math.sin(x * freq + t);
+      field += Math.sin(y * (freq + 1) + t * 1.3);
+      field += Math.sin(z * (freq + 0.5) + t * 0.9);
+      field += Math.sin((x + y) * (1.5 + p1 * 2) + t * 0.7);
+      field += Math.sin(Math.hypot(cx, cy, cz) * (2 + p1 * 3) - t);
+      field = clamp01(field * 0.2 + 0.5);
+      c = lerpHsv(primary, secondary, field);
+      c.v = ((c.v / 255) * (0.2 + 0.8 * field) * 255 * inten) | 0;
+      break;
+    }
+    case 3: { // noise — p1 = contrast
+      let n = noise2(x + t * 0.2, y - t * 0.15);
+      let n2 = noise2(x * 2 - t, z * 2 + t * 0.3);
+      const contrast = 0.35 + p1 * 1.65;
+      n = clamp01((n - 0.5) * contrast + 0.5);
+      n2 = clamp01((n2 - 0.5) * contrast + 0.5);
+      c = {
+        h: (primary.h + n * 40) & 255,
+        s: lerpU8(primary.s, (primary.s * 0.55) | 0, n2),
+        v: ((primary.v / 255) * n * 255 * inten) | 0,
+      };
+      break;
+    }
+    case 4: {
+      const d = Math.hypot(cx, cy, cz);
+      const waves = 4 + p1 * 16;
+      const w = 0.5 + 0.5 * Math.sin(d * waves - t * 4);
+      c = lerpHsv(primary, secondary, w);
+      c.v = ((c.v / 255) * w * 255 * inten) | 0;
+      break;
+    }
+    case 5: {
+      const plane = x * 0.6 + y * 0.3 + z * 0.1 - t * 0.5;
+      const f = fract(plane);
+      const bw = 0.06 + p1 * 0.35;
+      const band = f < bw ? (1 - f / bw) : 0;
+      c = lerpHsv(primary, secondary, band);
+      c.v = ((c.v / 255) * band * 255 * inten) | 0;
+      break;
+    }
+    case 6: {
+      const r = Math.sqrt(x * x + y * y);
+      let a = Math.atan2(y, x) / (Math.PI * 2);
+      if (a < 0) a += 1;
+      const spoke = Math.abs(Math.sin(a * Math.PI * 6));
+      const ring = 0.5 + 0.5 * Math.sin(r * 14);
+      const mix = spoke * 0.65 + ring * 0.35;
+      c = { h: ((a * 255) + r * 30) & 255, s: 230, v: (mix * 255 * inten) | 0 };
+      break;
+    }
+    case 7: {
+      const parity = (Math.floor(x * pat + t * 0.35) + Math.floor(y * pat - t * 0.2) + Math.floor(z * pat + t * 0.15)) & 1;
+      c = parity ? primary : secondary;
+      c.v = (c.v * inten) | 0;
+      break;
+    }
+    case 8: {
+      const phase = cx * pat + cy * 2 + cz * 3 - t * 2;
+      const band = fract(phase) < 0.5 ? 1 : 0;
+      c = band ? primary : secondary;
+      c.v = (c.v * inten * (0.4 + 0.6 * band)) | 0;
+      break;
+    }
+    case 9: {
+      const gx = Math.abs(fract(cx * pat + t * 0.1) - 0.5);
+      const gy = Math.abs(fract(cy * pat - t * 0.08) - 0.5);
+      const gz = Math.abs(fract(cz * pat + t * 0.06) - 0.5);
+      const line = Math.max(smoothpulse(gx, lineW), smoothpulse(gy, lineW), smoothpulse(gz, lineW));
+      const cell = ((Math.floor(cx * pat + t * 0.1) + Math.floor(cy * pat - t * 0.08) + Math.floor(cz * pat + t * 0.06)) & 1) ? 0.35 : 0.12;
+      const mix = clamp01(Math.max(line, cell));
+      c = lerpHsv(primary, secondary, cell / 0.35);
+      c.v = ((c.v / 255) * mix * 255 * inten) | 0;
+      break;
+    }
+    case 10: {
+      const d = Math.max(Math.abs(cx), Math.abs(cy), Math.abs(cz));
+      const field = 0.5 + 0.5 * Math.sin(d * 14 - t * 5);
+      let edge = Math.abs(Math.sin(d * 14 - t * 5));
+      edge = edge > 0.72 ? (edge - 0.72) / 0.28 : 0;
+      c = lerpHsv(primary, secondary, field);
+      const bri = clamp01(0.22 + field * 0.55 + edge * 0.45);
+      c.v = ((c.v / 255) * bri * 255 * inten) | 0;
+      break;
+    }
+    case 11: {
+      const d = Math.hypot(cx, cy, cz);
+      const field = 0.5 + 0.5 * Math.sin(d * 12 - t * 4.5);
+      let ring = Math.abs(Math.sin(d * 12 - t * 4.5));
+      ring = ring > 0.78 ? (ring - 0.78) / 0.22 : 0;
+      c = lerpHsv(primary, secondary, field);
+      const bri = clamp01(0.2 + field * 0.55 + ring * 0.45);
+      c.v = ((c.v / 255) * bri * 255 * inten) | 0;
+      break;
+    }
+    case 12: {
+      const thr = 0.14 + 0.03 * Math.sin(t * 3);
+      let m = Math.max(clamp01(1 - Math.abs(cx) / thr), clamp01(1 - Math.abs(cy) / thr), clamp01(1 - Math.abs(cz) / thr));
+      m = m * m;
+      c = m > 0.25 ? primary : secondary;
+      c.v = ((c.v / 255) * clamp01(m + 0.1) * 255 * inten) | 0;
+      break;
+    }
+    case 13: {
+      const d = Math.abs(cx) + Math.abs(cy) + Math.abs(cz);
+      const cell = fract(d * pat - t * 1.2);
+      const on = cell < 0.45 ? 1 : (cell < 0.65 ? (0.65 - cell) / 0.2 : 0);
+      const body = 0.15 + 0.2 * (0.5 + 0.5 * Math.sin(d * 8 - t));
+      const mix = clamp01(Math.max(on, body));
+      c = lerpHsv(primary, secondary, body);
+      c.v = ((c.v / 255) * mix * 255 * inten) | 0;
+      break;
+    }
+    case 14: {
+      const r = Math.hypot(cx, cy, cz);
+      const ang = Math.atan2(cy, cx);
+      const arm = fract((ang / (Math.PI * 2)) * 3 + r * 3.5 - t * 0.8);
+      const band = arm < 0.35 ? 1 - arm / 0.35 : 0;
+      const body = 0.12 + 0.25 * (0.5 + 0.5 * Math.sin(r * 8 - t * 2));
+      const mix = clamp01(Math.max(band, body));
+      c = lerpHsv(primary, secondary, band);
+      c.v = ((c.v / 255) * mix * 255 * inten) | 0;
+      break;
+    }
+    case 15: {
+      const r = Math.hypot(cx, cy, cz) + 1e-4;
+      let a = Math.atan2(cy, cx) / (Math.PI * 2);
+      if (a < 0) a += 1;
+      const spoke = Math.pow(Math.abs(Math.sin(a * Math.PI * 8 + t * 0.7)), 2.5);
+      const pulse = 0.5 + 0.5 * Math.sin(r * 9 - t * 3);
+      let mix = Math.max(spoke * (0.45 + 0.55 * pulse), 0.15 + 0.2 * pulse);
+      mix *= 0.8 + 0.2 * (0.5 + 0.5 * Math.sin(cz * 6 + t));
+      c = lerpHsv(primary, secondary, spoke);
+      c.v = ((c.v / 255) * clamp01(mix) * 255 * inten) | 0;
+      break;
+    }
+    case 16: {
+      const u = Math.abs(cx) * pat + cy * pat + cz * 2.4 - t * 2.2;
+      const band = fract(u) < 0.4 ? 1 : 0;
+      c = band ? primary : secondary;
+      c.v = (c.v * inten) | 0;
+      break;
+    }
+    case 17: {
+      const ang = Math.atan2(cx, cz);
+      const ridge = Math.abs(Math.sin(ang * 2 + cy * 10 - t * 3));
+      const tube = Math.exp(-((cx * cx + cz * cz) * 5));
+      let mix = ridge * (0.3 + 0.7 * tube);
+      mix = Math.max(mix, 0.12 + 0.2 * (0.5 + 0.5 * Math.sin(cy * 8 - t * 2)));
+      c = lerpHsv(primary, secondary, ridge);
+      c.v = ((c.v / 255) * clamp01(mix) * 255 * inten) | 0;
+      break;
+    }
+    case 18: {
+      const thr = 0.14;
+      const pxp = clamp01(1 - Math.abs(cx) / thr);
+      const pyp = clamp01(1 - Math.abs(cy) / thr);
+      const pzp = clamp01(1 - Math.abs(cz) / thr);
+      let m = Math.max(pxp, pyp, pzp); m = m * m;
+      if (pxp >= pyp && pxp >= pzp) c = primary;
+      else if (pyp >= pzp) c = secondary;
+      else c = lerpHsv(primary, secondary, 0.5);
+      c.v = ((c.v / 255) * clamp01(m + 0.1) * 255 * inten) | 0;
+      break;
+    }
+    case 19: {
+      const phase = fract(t * 0.25);
+      const axis = Math.floor(phase * 3);
+      const u = fract(phase * 3);
+      const scan = axis < 0.5 ? cx : (axis < 1.5 ? cy : cz);
+      const d = Math.abs(scan - (u * 2 - 1) * 0.55);
+      const band = d < 0.14 ? 1 - d / 0.14 : 0;
+      c = lerpHsv(primary, secondary, band);
+      c.v = ((c.v / 255) * clamp01(band + 0.14) * 255 * inten) | 0;
+      break;
+    }
+    case 20: {
+      const d1 = Math.hypot(cx - 0.25, cy, cz);
+      const d2 = Math.hypot(cx + 0.25, cy, cz - 0.1);
+      let vv = Math.sin(d1 * 14 - t * 3) + Math.sin(d2 * 14 + t * 2.2);
+      vv = clamp01(vv * 0.25 + 0.5);
+      c = lerpHsv(primary, secondary, vv);
+      c.v = ((c.v / 255) * vv * 255 * inten) | 0;
+      break;
+    }
+    case 21: {
+      const s3 = cx * pat, qq = cy * pat, r = cz * pat;
+      const uu = s3 + 0.5 * qq, vv = 0.8660254 * qq, ww = r * 0.75;
+      const fu = Math.abs(fract(uu + t * 0.2) - 0.5);
+      const fv = Math.abs(fract(vv - t * 0.15) - 0.5);
+      const fw = Math.abs(fract(ww + t * 0.1) - 0.5);
+      const line = Math.max(smoothpulse(fu, lineW), smoothpulse(fv, lineW), smoothpulse(fw, lineW));
+      const fill = ((Math.floor(uu) + Math.floor(vv) + Math.floor(ww)) & 1) ? 0.38 : 0.14;
+      const mix = clamp01(Math.max(line, fill));
+      c = lerpHsv(primary, secondary, fill);
+      c.v = ((c.v / 255) * mix * 255 * inten) | 0;
+      break;
+    }
+    case 22: {
+      const d = Math.max(Math.abs(cx), Math.abs(cy), Math.abs(cz));
+      const pulse = fract(t * 0.35);
+      const shell = Math.abs(d - pulse * 0.7);
+      const on = shell < 0.08 ? 1 - shell / 0.08 : 0;
+      const core = d < pulse * 0.7 ? (0.2 + 0.35 * (1 - d / Math.max(pulse * 0.7, 1e-3))) : 0.08;
+      const mix = clamp01(Math.max(on, core));
+      c = lerpHsv(primary, secondary, pulse);
+      c.v = ((c.v / 255) * mix * 255 * inten) | 0;
+      break;
+    }
+    case 23: {
+      const r = Math.hypot(cx, cy, cz);
+      let a = Math.atan2(cy, cx) / (Math.PI * 2);
+      if (a < 0) a += 1;
+      const rings = Math.abs(fract(r * pat - t * 0.5) - 0.5);
+      const rays = Math.abs(fract(a * 10 + t * 0.1) - 0.5);
+      const m = Math.max(smoothpulse(rings, lineW), smoothpulse(rays, lineW * 0.85));
+      const body = 0.14 + 0.28 * (0.5 + 0.5 * Math.sin(r * 7 - t * 2));
+      const mix = clamp01(Math.max(m, body));
+      c = lerpHsv(primary, secondary, m);
+      c.v = ((c.v / 255) * mix * 255 * inten) | 0;
+      break;
+    }
+    case 24: {
+      const wallX = 0.5 * Math.sin(cy * pat + cz * 4 - t * 3);
+      const wallY = 0.5 * Math.sin(cx * pat + cz * 3 + t * 2.5);
+      const wallZ = 0.5 * Math.sin(cx * pat + cy * pat - t * 2);
+      const w = 0.2;
+      const dx = clamp01(1 - Math.abs(cx - wallX) / w);
+      const dy = clamp01(1 - Math.abs(cy - wallY) / w);
+      const dz = clamp01(1 - Math.abs(cz - wallZ) / w);
+      let m = Math.max(dx, dy, dz); m = 0.15 + 0.85 * (m * m);
+      c = lerpHsv(primary, secondary, m);
+      c.v = ((c.v / 255) * m * 255 * inten) | 0;
+      break;
+    }
+    default:
+      break;
+  }
+  return hsvToRgb(c.h, c.s, Math.max(0, Math.min(255, c.v)));
+}
+
+/** Center a raw lattice on the origin — keeps spacing and overall size. */
+function centerWorldPts(raw){
+  if (!raw.length) return [];
+  let minx = Infinity, maxx = -Infinity, miny = Infinity, maxy = -Infinity, minz = Infinity, maxz = -Infinity;
+  raw.forEach(p => {
+    const x = p.x || 0, y = p.y || 0, z = p.z || 0;
+    if (x < minx) minx = x; if (x > maxx) maxx = x;
+    if (y < miny) miny = y; if (y > maxy) maxy = y;
+    if (z < minz) minz = z; if (z > maxz) maxz = z;
+  });
+  const cx = (minx + maxx) * 0.5;
+  const cy = (miny + maxy) * 0.5;
+  const cz = (minz + maxz) * 0.5;
+  return raw.map(p => ({
+    x: (p.x || 0) - cx,
+    y: (p.y || 0) - cy,
+    z: (p.z || 0) - cz,
+  }));
+}
+
+/** Unit-normalize for firmware / formula export (erases absolute size). */
+function normalizeWorldPts(raw){
+  const centered = centerWorldPts(raw);
+  if (!centered.length) return [];
+  let m = 0;
+  centered.forEach(p => {
+    m = Math.max(m, Math.abs(p.x), Math.abs(p.y), Math.abs(p.z));
+  });
+  const s = Math.max(m * 2, 1e-6);
+  return centered.map(p => ({
+    x: p.x / s + 0.5,
+    y: p.y / s + 0.5,
+    z: p.z / s + 0.5,
+  }));
+}
+
+/** Build a W×H×D lattice for Effects (matches Map settings, not strip clip). */
+function fxSyntheticGrid(W, H, D, sp, maxPts){
+  const total = W * H * D;
+  let sx = 1, sy = 1, sz = 1;
+  if (total > maxPts) {
+    // Uniform axis stride so depth is not collapsed by a linear index skip
+    let s = 1;
+    while (Math.ceil(W / s) * Math.ceil(H / s) * Math.ceil(D / s) > maxPts) s++;
+    sx = sy = sz = s;
+  }
+  const raw = [];
+  for (let zi = 0; zi < D; zi += sz)
+    for (let yi = 0; yi < H; yi += sy)
+      for (let xi = 0; xi < W; xi += sx)
+        raw.push({ x: xi * sp, y: yi * sp, z: zi * sp });
+  return centerWorldPts(raw);
+}
+
+/** Downsample a full W×H×D map with per-axis stride (keeps all dimensions). */
+function fxSampleLatticeMap(pts, W, H, D, maxPts){
+  if (pts.length !== W * H * D) return null;
+  if (pts.length <= maxPts) {
+    return pts.map(p => ({ x: p.x || 0, y: p.y || 0, z: p.z || 0 }));
+  }
+  let s = 1;
+  while (Math.ceil(W / s) * Math.ceil(H / s) * Math.ceil(D / s) > maxPts) s++;
+  const out = [];
+  const idx = (x, y, z) => z * H * W + y * W + x;
+  for (let z = 0; z < D; z += s)
+    for (let y = 0; y < H; y += s)
+      for (let x = 0; x < W; x += s) {
+        const p = pts[idx(x, y, z)];
+        if (p) out.push({ x: p.x || 0, y: p.y || 0, z: p.z || 0 });
+      }
+  return out;
+}
+
+function fxDownsample(pts, maxPts){
+  if (pts.length <= maxPts) return pts;
+  const step = Math.ceil(pts.length / maxPts);
+  const out = [];
+  for (let i = 0; i < pts.length; i += step) out.push(pts[i]);
+  return out;
+}
+
+function fxSyntheticCircle(diam, sp, fill, maxN){
+  const R = diam < 2 ? 0 : 0.5 * (diam - 1) * sp;
+  const raw = [];
+  if (fill === 1) {
+    const lim = Math.ceil(R / sp + 1e-4);
+    const r2 = R * R + 1e-4;
+    const cells = [];
+    for (let yi = -lim; yi <= lim; yi++)
+      for (let xi = -lim; xi <= lim; xi++) {
+        const x = xi * sp, y = yi * sp;
+        if (x * x + y * y <= r2) cells.push({ x, y, z: 0 });
+      }
+    const stride = cells.length <= maxN ? 1 : Math.ceil(cells.length / maxN);
+    for (let i = 0; i < cells.length && raw.length < maxN; i++)
+      if (i % stride === 0) raw.push(cells[i]);
+  } else {
+    raw.push({ x: 0, y: 0, z: 0 });
+    const rings = R > 0 && sp > 0 ? Math.floor(R / sp + 1e-4) : 0;
+    for (let ring = 1; ring <= rings && raw.length < maxN; ring++) {
+      const r = ring * sp;
+      const on = Math.max(6, Math.round(2 * Math.PI * r / sp));
+      if (on > maxN - raw.length) break; /* keep rings complete */
+      for (let k = 0; k < on; k++) {
+        const ang = 2 * Math.PI * k / on;
+        raw.push({ x: Math.cos(ang) * r, y: Math.sin(ang) * r, z: 0 });
+      }
+    }
+  }
+  return centerWorldPts(raw);
+}
+
+function fxSyntheticSphere(diam, sp, fill, maxN){
+  const R = Math.max(sp * 0.5, diam < 2 ? 0 : 0.5 * (diam - 1) * sp);
+  const raw = [];
+  if (fill === 1) {
+    const lim = Math.ceil(R / sp + 1e-4);
+    const r2 = R * R + 1e-4;
+    const cells = [];
+    for (let zi = -lim; zi <= lim; zi++)
+      for (let yi = -lim; yi <= lim; yi++)
+        for (let xi = -lim; xi <= lim; xi++) {
+          const x = xi * sp, y = yi * sp, z = zi * sp;
+          if (x * x + y * y + z * z <= r2) cells.push({ x, y, z });
+        }
+    const stride = cells.length <= maxN ? 1 : Math.ceil(cells.length / maxN);
+    for (let i = 0; i < cells.length && raw.length < maxN; i++)
+      if (i % stride === 0) raw.push(cells[i]);
+  } else {
+    let want = Math.max(1, Math.round(4 * Math.PI * (R / sp) * (R / sp)));
+    if (want > maxN) want = maxN;
+    const ga = Math.PI * (3 - Math.sqrt(5));
+    for (let k = 0; k < want; k++) {
+      const t = want <= 1 ? 0 : (k + 0.5) / want;
+      const y = 1 - 2 * t;
+      const rXZ = Math.sqrt(Math.max(0, 1 - y * y));
+      const th = ga * k;
+      raw.push({ x: Math.cos(th) * rXZ * R, y: y * R, z: Math.sin(th) * rXZ * R });
+    }
+  }
+  return centerWorldPts(raw);
+}
+
+function ensureLatticeCorners(raw, W, H, D, sp, n){
+  const xs = [0, Math.max(0, W - 1)];
+  const ys = [0, Math.max(0, H - 1)];
+  const zs = D <= 1 ? [0] : [0, Math.max(0, D - 1)];
+  const x1 = xs[xs.length - 1] * sp, y1 = ys[ys.length - 1] * sp, z1 = zs[zs.length - 1] * sp;
+  const near = (a, b) => Math.abs(a - b) <= 1e-3;
+  const isCorner = (p) => {
+    const xe = near(p.x, 0) || near(p.x, x1);
+    const ye = near(p.y, 0) || near(p.y, y1);
+    const ze = D <= 1 || near(p.z || 0, 0) || near(p.z || 0, z1);
+    return xe && ye && ze;
+  };
+  for (const z of zs) for (const y of ys) for (const x of xs) {
+    const px = x * sp, py = y * sp, pz = z * sp;
+    if (raw.some(p => near(p.x, px) && near(p.y, py) && near(p.z || 0, pz))) continue;
+    const pt = { x: px, y: py, z: pz };
+    if (raw.length < n) raw.push(pt);
+    else {
+      let slot = -1;
+      for (let i = raw.length - 1; i >= 0; i--) {
+        if (!isCorner(raw[i])) { slot = i; break; }
+      }
+      if (slot >= 0) raw[slot] = pt;
+    }
+  }
+}
+
+function fxSyntheticBox(W, H, D, sp, n, fill, openTb){
+  const raw = [];
+  if (fill === 1) {
+    // Stride-sample so a short strip still spans the full W×H×D box
+    const total = W * H * D;
+    const stride = total <= n ? 1 : Math.ceil(total / n);
+    let seen = 0;
+    for (let z = 0; z < D && raw.length < n; z++)
+      for (let y = 0; y < H && raw.length < n; y++)
+        for (let x = 0; x < W && raw.length < n; x++) {
+          if ((seen++ % stride) !== 0) continue;
+          raw.push({ x: x * sp, y: y * sp, z: z * sp });
+        }
+    ensureLatticeCorners(raw, W, H, D, sp, n);
+  } else {
+    // Corners first (full extent), then per-face budgets for the remaining strip
+    const faceId = (x, y, z) => {
+      if (z === 0) return 0;
+      if (D > 1 && z === D - 1) return 1;
+      if (!openTb && y === 0) return 2;
+      if (!openTb && H > 1 && y === H - 1) return 3;
+      if (x === 0) return 4;
+      if (W > 1 && x === W - 1) return 5;
+      return -1;
+    };
+    const isCorner = (x, y, z) =>
+      (x === 0 || x === W - 1) && (y === 0 || y === H - 1) && (D <= 1 || z === 0 || z === D - 1);
+    const zsC = D <= 1 ? [0] : [0, D - 1];
+    const ysC = H <= 1 ? [0] : [0, H - 1];
+    const xsC = W <= 1 ? [0] : [0, W - 1];
+    const cornerSet = new Set();
+    for (const z of zsC) for (const y of ysC) for (const x of xsC) {
+      if (raw.length >= n) break;
+      const key = x + ',' + y + ',' + z;
+      if (cornerSet.has(key)) continue;
+      cornerSet.add(key);
+      raw.push({ x: x * sp, y: y * sp, z: z * sp });
+    }
+    const faces = [[], [], [], [], [], []];
+    for (let z = 0; z < D; z++)
+      for (let y = 0; y < H; y++)
+        for (let x = 0; x < W; x++) {
+          if (isCorner(x, y, z)) continue;
+          const f = faceId(x, y, z);
+          if (f >= 0) faces[f].push([x, y, z]);
+        }
+    const fc = faces.map(f => f.length);
+    const total = fc.reduce((a, b) => a + b, 0);
+    const budget = n - raw.length;
+    const facesNz = fc.filter(c => c > 0).length;
+    const allot = [0, 0, 0, 0, 0, 0];
+    if (budget > 0 && total > 0 && budget >= facesNz) {
+      for (let f = 0; f < 6; f++) if (fc[f]) allot[f] = 1;
+      let left = budget - allot.reduce((a, b) => a + b, 0);
+      const remCells = total - facesNz;
+      if (left > 0 && remCells > 0) {
+        let given = 0;
+        for (let f = 0; f < 6; f++) {
+          if (fc[f] <= 1) continue;
+          let extra = Math.floor(left * (fc[f] - 1) / remCells);
+          extra = Math.min(extra, fc[f] - allot[f]);
+          allot[f] += extra;
+          given += extra;
+        }
+        for (let f = 0; f < 6 && given < left; f++) {
+          if (fc[f] > allot[f]) { allot[f]++; given++; }
+        }
+      }
+    } else if (budget > 0 && total > 0) {
+      let assigned = 0;
+      for (let f = 0; f < 6 && assigned < budget; f++) {
+        if (fc[f]) { allot[f] = 1; assigned++; }
+      }
+    }
+    for (let f = 0; f < 6; f++) {
+      const cells = faces[f];
+      const want = allot[f];
+      if (!want || !cells.length) continue;
+      const stride = cells.length <= want ? 1 : Math.ceil(cells.length / want);
+      let got = 0;
+      for (let i = 0; i < cells.length && got < want && raw.length < n; i++) {
+        if (i % stride) continue;
+        const [x, y, z] = cells[i];
+        raw.push({ x: x * sp, y: y * sp, z: z * sp });
+        got++;
+      }
+    }
+  }
+  return centerWorldPts(raw);
+}
+
+function fxSyntheticCylinder(diam, heightPx, sp, openTb, maxN){
+  const radius = Math.max(sp, diam < 2 ? sp : 0.5 * (diam - 1) * sp);
+  const circ = Math.max(6, Math.round(Math.PI * Math.max(1, diam - 1)));
+  const rings = Math.max(1, heightPx);
+  const height = rings > 1 ? (rings - 1) * sp : 0;
+  const raw = [];
+  for (let r = 0; r < rings && raw.length < maxN; r++) {
+    const y = rings <= 1 ? 0 : (r / (rings - 1) - 0.5) * height;
+    for (let c = 0; c < circ && raw.length < maxN; c++) {
+      const a = 2 * Math.PI * c / circ;
+      raw.push({ x: Math.cos(a) * radius, y, z: Math.sin(a) * radius });
+    }
+  }
+  if (!openTb) {
+    const lim = Math.ceil(radius / sp + 1e-4);
+    const r2 = radius * radius + 1e-4;
+    for (let cap = 0; cap < 2 && raw.length < maxN; cap++) {
+      const y = cap === 0 ? -0.5 * height : 0.5 * height;
+      for (let yi = -lim; yi <= lim && raw.length < maxN; yi++)
+        for (let xi = -lim; xi <= lim && raw.length < maxN; xi++) {
+          const x = xi * sp, z = yi * sp;
+          if (x * x + z * z > r2) continue;
+          raw.push({ x, y, z });
+        }
+    }
+  }
+  return centerWorldPts(raw.slice(0, maxN));
+}
+
+function fxSyntheticDome(diam, sp, maxN){
+  const R = Math.max(sp, diam < 2 ? sp : 0.5 * (diam - 1) * sp);
+  let want = Math.max(1, Math.round(2 * Math.PI * (R / sp) * (R / sp)));
+  if (want > maxN) want = maxN;
+  const ga = Math.PI * (3 - Math.sqrt(5));
+  const raw = [];
+  const gen = want * 2 + 8;
+  for (let k = 0; k < gen && raw.length < want; k++) {
+    const t = (k + 0.5) / gen;
+    const y = 1 - 2 * t;
+    if (y < -1e-4) continue;
+    const rXZ = Math.sqrt(Math.max(0, 1 - y * y));
+    const th = ga * k;
+    raw.push({ x: Math.cos(th) * rXZ * R, y: y * R, z: Math.sin(th) * rXZ * R });
+  }
+  return centerWorldPts(raw);
+}
+
+function fxSyntheticPyramid(basePx, heightPx, sp, maxN){
+  const edge = Math.max(2, basePx);
+  const rise = Math.max(2, heightPx);
+  const half = 0.5 * (edge - 1) * sp;
+  const apexY = (rise - 1) * sp;
+  const corners = [
+    [-half, 0, -half], [half, 0, -half], [half, 0, half], [-half, 0, half],
+  ];
+  const raw = [];
+  for (let e = 0; e < 4 && raw.length < maxN; e++) {
+    const a = corners[e], b = corners[(e + 1) & 3];
+    for (let s = 0; s < edge && raw.length < maxN; s++) {
+      if (e > 0 && s === 0) continue;
+      const t = edge <= 1 ? 0 : s / (edge - 1);
+      raw.push({ x: a[0] + (b[0] - a[0]) * t, y: 0, z: a[2] + (b[2] - a[2]) * t });
+    }
+  }
+  for (let e = 0; e < 4 && raw.length < maxN; e++) {
+    const a = corners[e];
+    for (let s = 1; s < rise && raw.length < maxN; s++) {
+      const t = s / (rise - 1);
+      raw.push({ x: a[0] * (1 - t), y: apexY * t, z: a[2] * (1 - t) });
+    }
+  }
+  for (let e = 0; e < 4 && raw.length < maxN; e++) {
+    const a = corners[e], b = corners[(e + 1) & 3];
+    for (let r = 1; r < rise && raw.length < maxN; r++) {
+      const v = r / rise;
+      const cols = Math.max(1, edge - ((r * (edge - 1)) / rise) | 0);
+      for (let c = 0; c < cols && raw.length < maxN; c++) {
+        const u = cols <= 1 ? 0.5 : c / (cols - 1);
+        const bx = a[0] + (b[0] - a[0]) * u;
+        const bz = a[2] + (b[2] - a[2]) * u;
+        raw.push({ x: bx * (1 - v), y: apexY * v, z: bz * (1 - v) });
+      }
+    }
+  }
+  return centerWorldPts(raw.slice(0, maxN));
+}
+
+function fxSamplePoints(){
+  const lay = mapLayout();
+  const sp = Math.max(0.1, +mspc.value || 1);
+  const fill = +mfill.value | 0;
+  const openTb = !!mopentb.checked && fill === 0;
+  const strip = Math.max(1, Math.min(4096, +count.value | 0));
+  const maxPts = 4096;
+  const W = Math.max(1, +mw.value | 0);
+  const H = Math.max(1, +mh.value | 0);
+  const D = Math.max(1, +md.value | 0);
+
+  // Custom formula: only the live uploaded map
+  if (lay === 7) {
+    if (!map.length) return [];
+    return fxDownsample(map.map(p => ({ x: p.x || 0, y: p.y || 0, z: p.z || 0 })), maxPts);
+  }
+
+  // Preview from dimension settings × spacing (world units, centered)
+  let pts;
+  if (lay === 0) {
+    const depth = (+mdim.value === 1) ? D : 1;
+    pts = fxSyntheticGrid(W, H, depth, sp, Math.min(strip, maxPts));
+  } else if (lay === 1) {
+    pts = fxSyntheticCircle(W, sp, fill, strip);
+  } else if (lay === 2) {
+    pts = fxSyntheticSphere(W, sp, fill, strip);
+  } else if (lay === 3) {
+    pts = fxSyntheticBox(W, H, D, sp, strip, fill, openTb);
+  } else if (lay === 4) {
+    pts = fxSyntheticCylinder(W, H, sp, openTb, strip);
+  } else if (lay === 5) {
+    pts = fxSyntheticDome(W, sp, strip);
+  } else if (lay === 6) {
+    pts = fxSyntheticPyramid(W, H, sp, strip);
+  } else {
+    pts = fxSyntheticGrid(W, H, D, sp, Math.min(strip, maxPts));
+  }
+  return fxDownsample(pts, maxPts);
+}
+
+/** Match components/pov/src/pov.c pm_pov_world_pos */
+function povWorldPos(pixelIndex, pixelCount, timeMs){
+  const mode = +povm.value | 0;
+  const layout = +poyl.value | 0;
+  let blades = 1;
+  let ppb = pixelCount;
+  let blade = 0;
+  let local = pixelIndex;
+  if (mode === 1) {
+    blades = Math.max(1, Math.min(10, +povbl.value | 0));
+    ppb = Math.floor(pixelCount / blades);
+    if (ppb < 1) { ppb = pixelCount; blades = 1; }
+    blade = Math.min(blades - 1, Math.floor(pixelIndex / ppb));
+    local = Math.min(ppb - 1, pixelIndex - blade * ppb);
+  }
+  let span = 0;
+  if (ppb > 1) {
+    const t = local / (ppb - 1);
+    span = layout === 0 ? t : (t * 2 - 1);
+  }
+  const radius = Math.max(1e-4, +povrad.value || 0.25);
+  const tSec = (timeMs || 0) * 0.001;
+  if (mode === 1) {
+    const rpm = Math.max(0, +povrpm.value || 0);
+    const base = 2 * Math.PI * (rpm / 60) * tSec;
+    const angle = base + blade * (2 * Math.PI / blades);
+    const r = span * radius;
+    return { x: r * Math.cos(angle), y: r * Math.sin(angle), z: 0, blade, span, angle };
+  }
+  if (mode === 2) {
+    const pathLen = Math.max(1e-4, +povpath.value || 1);
+    const lin = Math.max(0, +povspd.value || 0);
+    let phase = ((lin * tSec) / pathLen) % 1;
+    if (phase < 0) phase += 1;
+    const u = phase < 0.5 ? phase * 2 : 2 - phase * 2;
+    return { x: (u - 0.5) * pathLen, y: span * radius, z: 0, blade: 0, span, angle: 0 };
+  }
+  return { x: span * radius, y: 0, z: 0, blade: 0, span, angle: 0 };
+}
+
+/** Match effects.c sample_pos() normalization for POV. */
+function povEffectPos(world){
+  const mode = +povm.value | 0;
+  const inv = 1 / Math.max(1e-4, +povrad.value || 0.25);
+  if (mode === 2) {
+    const pathLen = Math.max(1e-4, +povpath.value || 1);
+    return { x: world.x / pathLen, y: world.y * inv, z: 0 };
+  }
+  return { x: world.x * inv, y: world.y * inv, z: 0 };
+}
+
+function povViewMetrics(w, h){
+  const mode = +povm.value | 0;
+  const layout = +poyl.value | 0;
+  const radius = Math.max(1e-4, +povrad.value || 0.25);
+  const pathLen = Math.max(1e-4, +povpath.value || 1);
+  const cx = w / 2, cy = h / 2;
+  if (mode === 2) {
+    const yMin = layout === 0 ? 0 : -radius;
+    const yMax = radius;
+    const halfPath = pathLen * 0.5;
+    const world = Math.max(halfPath, Math.max(Math.abs(yMin), yMax), 1e-4);
+    const scale = Math.min(w, h) * 0.42 / world;
+    return { mode, layout, radius, path: pathLen, cx, cy, scale, yMin, yMax, halfPath };
+  }
+  const scale = Math.min(w, h) * 0.42 / radius;
+  return { mode, layout, radius, path: pathLen, cx, cy, scale, rPx: radius * scale };
+}
+
+function povWorldToScreen(m, wx, wy){
+  return { x: m.cx + wx * m.scale, y: m.cy - wy * m.scale };
+}
+
+function povPixelsPerBlade(nLed){
+  const mode = +povm.value | 0;
+  if (mode !== 1) return { blades: 1, ppb: nLed };
+  let blades = Math.max(1, Math.min(10, +povbl.value | 0));
+  let ppb = Math.floor(nLed / blades);
+  if (ppb < 1) { ppb = nLed; blades = 1; }
+  return { blades, ppb };
+}
+
+function povLedDotRadiusPx(m, nLed){
+  const { ppb } = povPixelsPerBlade(nLed);
+  const spanM = m.layout === 0 ? m.radius : m.radius * 2;
+  const stepM = spanM / Math.max(1, ppb - 1);
+  // Diameter ~55% of pitch so radial gaps stay visible (no artificial min that fills dense strips)
+  const r = stepM * m.scale * 0.275;
+  return Math.max(0.45, Math.min(3.6, r));
+}
+
+function povTrailState(canvas, w, h){
+  let s = canvas._povTrail;
+  if (!s || s.w !== w || s.h !== h) {
+    const cnv = document.createElement('canvas');
+    cnv.width = w;
+    cnv.height = h;
+    s = { w, h, cnv, lastMs: null, sig: '' };
+    canvas._povTrail = s;
+  }
+  return s;
+}
+
+function povPreviewSig(id){
+  return [
+    id, pove.checked ? 1 : 0, povm.value, poyl.value, povbl.value,
+    povrpm.value, povspd.value, povrad.value, povpath.value,
+    count.value, speed.value
+  ].join('|');
+}
+
+function stampPovLeds(tctx, m, nLed, id, motionMs, effectT, inten, dotR, alpha){
+  const d = Math.max(0.9, dotR * 2);
+  const half = d * 0.5;
+  tctx.globalAlpha = alpha;
+  for (let i = 0; i < nLed; i++) {
+    const wpos = povWorldPos(i, nLed, motionMs);
+    const e = povEffectPos(wpos);
+    const [r, g, b] = evalEffect(id, e.x, e.y, 0, effectT, inten, i, nLed);
+    if (r + g + b < 8) continue;
+    const p = povWorldToScreen(m, wpos.x, wpos.y);
+    tctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+    tctx.fillRect(p.x - half, p.y - half, d, d);
+  }
+  tctx.globalAlpha = 1;
+}
+
+function drawPovArmsOverlay(ctx, m, nLed, motionMs, id, effectT, inten, dotR){
+  const { blades, ppb } = povPixelsPerBlade(nLed);
+  if (m.mode === 2) {
+    const w0 = povWorldPos(0, nLed, motionMs);
+    const x = m.cx + w0.x * m.scale;
+    ctx.strokeStyle = 'rgba(61,255,168,0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      m.cx - m.halfPath * m.scale,
+      m.cy - m.yMax * m.scale,
+      m.path * m.scale,
+      (m.yMax - m.yMin) * m.scale
+    );
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, m.layout === 0 ? m.cy : (m.cy + m.radius * m.scale));
+    ctx.lineTo(x, m.cy - m.radius * m.scale);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = 'rgba(61,255,168,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(m.cx, m.cy, m.rPx, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let b = 0; b < blades; b++) {
+      const ang = (povWorldPos(b * ppb, nLed, motionMs).angle) || 0;
+      const c = Math.cos(ang), s = Math.sin(ang);
+      ctx.strokeStyle = b === 0 ? 'rgba(255,255,255,0.7)' : 'rgba(200,220,210,0.45)';
+      ctx.lineWidth = b === 0 ? 2.25 : 1.5;
+      ctx.beginPath();
+      if (m.layout === 0) {
+        ctx.moveTo(m.cx, m.cy);
+        ctx.lineTo(m.cx + c * m.rPx, m.cy - s * m.rPx);
+      } else {
+        ctx.moveTo(m.cx - c * m.rPx, m.cy + s * m.rPx);
+        ctx.lineTo(m.cx + c * m.rPx, m.cy - s * m.rPx);
+      }
+      ctx.stroke();
+    }
+  }
+
+  const liveR = Math.max(dotR * 1.05, 0.7);
+  for (let i = 0; i < nLed; i++) {
+    const wpos = povWorldPos(i, nLed, motionMs);
+    const e = povEffectPos(wpos);
+    const [r, g, b] = evalEffect(id, e.x, e.y, 0, effectT, inten, i, nLed);
+    const p = povWorldToScreen(m, wpos.x, wpos.y);
+    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, liveR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/**
+ * POV preview: moving arms/wand stamp real LED positions into a fading trail.
+ * Radial gaps follow firmware pixel_span spacing (not a solid fill).
+ * @param {number} timeMs raw animation time (motion + effect clock base)
+ * @param {HTMLElement|null} hintEl optional status line (Effects tab)
+ */
+function drawFxPovPreview(ctx, w, h, id, timeMs, inten, hintEl){
+  const mode = +povm.value | 0;
+  const nLed = Math.max(1, Math.min(1200, +count.value | 0));
+  const spd = Math.max(0, +fxActiveState().speed || 0);
+  const effectT = (timeMs || 0) * 0.001 * spd;
+  const m = povViewMetrics(w, h);
+  const { blades, ppb } = povPixelsPerBlade(nLed);
+  const dotR = povLedDotRadiusPx(m, nLed);
+
+  if (ctx.canvas === fxCanvas) {
+    fxCanvas.classList.remove('is-3d');
+    document.getElementById('fxOrbitTools').classList.add('d-none');
+  }
+
+  const trail = povTrailState(ctx.canvas, w, h);
+  const tctx = trail.cnv.getContext('2d');
+  const sig = povPreviewSig(id);
+  if (trail.sig !== sig) {
+    tctx.fillStyle = '#0a0e0c';
+    tctx.fillRect(0, 0, w, h);
+    trail.sig = sig;
+    trail.lastMs = timeMs;
+  }
+
+  // Faster decay keeps a visible wake behind the arms instead of a saturated disk
+  tctx.fillStyle = 'rgba(10,14,12,0.16)';
+  tctx.fillRect(0, 0, w, h);
+
+  let last = trail.lastMs == null ? timeMs : trail.lastMs;
+  let dt = (timeMs || 0) - last;
+  if (dt < 0 || dt > 250) dt = 16;
+  const dtSec = dt * 0.001;
+
+  // Cap substeps so dense strips stay interactive (~24k stamps/frame)
+  const stepBudget = Math.max(4, Math.min(48, Math.floor(20000 / Math.max(1, nLed))));
+  let steps = 1;
+  if (mode === 2) {
+    const lin = Math.max(0, +povspd.value || 0);
+    const stepM = (m.layout === 0 ? m.radius : m.radius * 2) / Math.max(1, ppb - 1);
+    steps = Math.min(stepBudget, Math.max(1, Math.ceil((lin * dtSec) / Math.max(1e-4, stepM * 0.45))));
+  } else {
+    const rpm = Math.max(0, +povrpm.value || 0);
+    const omega = (rpm / 60) * Math.PI * 2;
+    // Leave slight angular gaps between stamps so motion reads as a trail
+    const maxDAng = Math.max(0.02, (1.8 * Math.max(dotR, 0.6)) / Math.max(1, m.scale * m.radius));
+    steps = Math.min(stepBudget, Math.max(1, Math.ceil((omega * dtSec) / maxDAng)));
+  }
+
+  for (let s = 1; s <= steps; s++) {
+    const t = last + dt * (s / steps);
+    const eT = t * 0.001 * spd;
+    stampPovLeds(tctx, m, nLed, id, t, eT, inten, Math.max(0.45, dotR * 0.9), 0.42);
+  }
+  trail.lastMs = timeMs;
+
+  ctx.fillStyle = '#0a0e0c';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(trail.cnv, 0, 0);
+  drawPovArmsOverlay(ctx, m, nLed, timeMs, id, effectT, inten, dotR);
+
+  const layoutName = m.layout === 0 ? 'Radius' : 'Diameter';
+  ctx.fillStyle = '#8aa093';
+  ctx.font = '12px sans-serif';
+  if (mode === 2) {
+    ctx.fillText(layoutName + ' · path ' + fmt1(m.path) + ' m · ' + ppb + ' LEDs on wand', 12, 18);
+    ctx.fillText(fmt1(+povspd.value || 0) + ' m/s · trail from pixel positions', 12, h - 12);
+    if (hintEl) hintEl.textContent = 'POV trail · linear wand · ' + nLed + ' LEDs · ' + ppb + ' on strip';
+  } else {
+    ctx.fillText(layoutName + ' · R ' + fmt1(m.radius) + ' m · ' + ppb + ' LEDs / blade', 12, 18);
+    ctx.fillText(blades + ' blade' + (blades > 1 ? 's' : '') + ' · '
+      + (+povrpm.value || 0) + ' RPM · gaps = pixel spacing', 12, h - 12);
+    if (hintEl) {
+      hintEl.textContent = 'POV trail · ' + blades + ' blade' + (blades > 1 ? 's' : '')
+        + ' · ' + nLed + ' LEDs · ' + ppb + ' per blade';
+    }
+  }
+}
+
+function drawFxPreview(ts){
+  const cv = fxCanvas, ctx = cv.getContext('2d');
+  const { w, h } = syncCanvasBuffer(cv);
+  ctx.fillStyle = '#0a0e0c';
+  ctx.fillRect(0, 0, w, h);
+
+  const id = +fx.value;
+  const timeMs = ts || 0;
+  fxRenderState = fxComputeLive(timeMs);
+  const spd = Math.max(0, +fxRenderState.speed || 0);
+  // Effect pattern time (firmware: time_ms * speed); POV motion uses raw time_ms
+  const tSec = timeMs * 0.001 * spd;
+  const inten = Math.max(0, Math.min(1, (fxRenderState.fxint | 0) / 255));
+
+  if (pove.checked) {
+    drawFxPovPreview(ctx, w, h, id, timeMs, inten, fxPreviewHint);
+    applyLiveToFxSliders(fxRenderState);
+    fxRenderState = null;
+    if (fxTabActive) fxRaf = requestAnimationFrame(drawFxPreview);
+    return;
+  }
+
+  const lay = mapLayout();
+  const dim3 = lay === 2 || +mdim.value === 1;
+  const samples = fxSamplePoints();
+  fxCanvas.classList.toggle('is-3d', dim3);
+  document.getElementById('fxOrbitTools').classList.toggle('d-none', !dim3);
+  const sp = fmt1(mspc.value);
+  const W = Math.max(1, +mw.value | 0), H = Math.max(1, +mh.value | 0);
+  const D = (+mdim.value === 1) ? Math.max(1, +md.value | 0) : 1;
+  let shapeLabel = shapeLayoutName();
+  if (lay === 0 || lay === 3) shapeLabel += ' · ' + W + '×' + H + (dim3 || lay === 3 ? '×' + D : '');
+  if (lay === 2) shapeLabel += (+mfill.value === 1 ? ' · solid' : ' · shell');
+  if (lay === 3) shapeLabel += (+mfill.value === 1 ? ' · solid' : (mopentb.checked ? ' · open TB' : ' · shell'));
+  if (lay === 4) shapeLabel += mopentb.checked ? ' · open TB' : ' · capped';
+  let hint = shapeLabel + ' · ' + samples.length + ' pts · spacing ' + sp;
+  if ((id|0) === 25) {
+    ensureLuaPreview();
+    hint += _luaErr ? (' · Lua preview error: ' + _luaErr) : ' · Custom Lua';
+  }
+  fxPreviewHint.textContent = hint;
+
+  if (!dim3) {
+    const cam = previewCamFromPoints(samples);
+    const b = mapBoundsView(samples, cam);
+    const p0 = viewToCanvasXY({ x: b.x0, y: b.y1 }, w, h);
+    const p1 = viewToCanvasXY({ x: b.x1, y: b.y0 }, w, h);
+    ctx.strokeStyle = '#2a3530';
+    ctx.strokeRect(p0.x - 2, p0.y - 2, Math.max(1, p1.x - p0.x) + 4, Math.max(1, p1.y - p0.y) + 4);
+    samples.forEach((p, i) => {
+      const v = toViewUnit(p, cam);
+      const en = worldToEffectNorm(p);
+      const [r, g, bcol] = evalEffect(id, en.x, en.y, en.z, tSec, inten, i, samples.length);
+      const { x, y } = viewToCanvasXY(v, w, h);
+      ctx.fillStyle = fxFillStyle(r, g, bcol);
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.fillStyle = '#8aa093';
+    ctx.font = '12px sans-serif';
+    const fillNote = lay === 1
+      ? ((+mfill.value === 1 ? 'Filled disk' : 'Concentric rings') + ' · ')
+      : '';
+    ctx.fillText(fillNote + 'spacing ' + sp, 12, 18);
+  } else {
+    if (fx3dAuto.checked && !fxOrbit.dragging) {
+      const last = drawFxPreview._lastTs || ts || 0;
+      const dt = Math.min(48, Math.max(0, (ts || 0) - last));
+      drawFxPreview._lastTs = ts || 0;
+      fxOrbit.yaw += dt * 0.00035;
+    } else {
+      drawFxPreview._lastTs = ts || 0;
+    }
+    const yaw = fxOrbit.yaw, pitch = fxOrbit.pitch, zoom = fxOrbit.zoom;
+    const cam = previewCamFromPoints(samples);
+    drawAxesBox(ctx, yaw, pitch, zoom, w, h, mapBoundsView(samples, cam));
+
+    const drawn = samples.map((p, i) => {
+      const en = worldToEffectNorm(p);
+      const [r, g, b] = evalEffect(id, en.x, en.y, en.z, tSec, inten, i, samples.length);
+      const v = toViewUnit(p, cam);
+      const pr = projectPoint(v.x, v.y, v.z, yaw, pitch, zoom, w, h);
+      return { pr, r, g, b };
+    }).sort((a, b) => a.pr.depth - b.pr.depth);
+    drawn.forEach(({ pr, r, g, b })=>{
+      const rad = Math.max(1.8, Math.min(5.5, pr.scale * 0.85));
+      ctx.fillStyle = fxFillStyle(r, g, b);
+      ctx.beginPath();
+      ctx.arc(pr.sx, pr.sy, rad, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.fillStyle = '#8aa093';
+    ctx.font = '12px sans-serif';
+    ctx.fillText(shapeLayoutName() + ' · spacing ' + sp, 12, 18);
+  }
+
+  applyLiveToFxSliders(fxRenderState);
+  fxRenderState = null;
+  if (fxTabActive) fxRaf = requestAnimationFrame(drawFxPreview);
+}
+
+function startFxAnim(){
+  cancelAnimationFrame(fxRaf);
+  if (fxTabActive) fxRaf = requestAnimationFrame(drawFxPreview);
+}
+
+function stopFxAnim(){
+  fxTabActive = false;
+  cancelAnimationFrame(fxRaf);
+}
+
+function fxCanvasXY(e){
+  const r = fxCanvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * (fxCanvas.width / r.width),
+    y: (e.clientY - r.top) * (fxCanvas.height / r.height)
+  };
+}
+
+fxCanvas.onpointerdown = e => {
+  if (pove.checked || !isMap3d()) return;
+  fxOrbit.dragging = true;
+  fxOrbit.lastX = e.clientX;
+  fxOrbit.lastY = e.clientY;
+  fxCanvas.setPointerCapture(e.pointerId);
 };
+fxCanvas.onpointermove = e => {
+  if (!fxOrbit.dragging || pove.checked || !isMap3d()) return;
+  fxOrbit.yaw += (e.clientX - fxOrbit.lastX) * 0.008;
+  // Drag up → higher elevation (more from above)
+  fxOrbit.pitch = clampOrbitPitch(fxOrbit.pitch - (e.clientY - fxOrbit.lastY) * 0.01);
+  fxOrbit.lastX = e.clientX;
+  fxOrbit.lastY = e.clientY;
+};
+fxCanvas.onpointerup = () => { fxOrbit.dragging = false; };
+fxCanvas.onpointercancel = () => { fxOrbit.dragging = false; };
+fxCanvas.onwheel = e => {
+  if (pove.checked || !isMap3d()) return;
+  e.preventDefault();
+  fxOrbit.zoom = Math.max(0.45, Math.min(2.8, fxOrbit.zoom * (e.deltaY > 0 ? 0.92 : 1.08)));
+};
+
+window.addEventListener('resize', ()=>{
+  const mapTab = document.getElementById('tab-map');
+  if (mapTab && mapTab.classList.contains('active')) startMapAnim();
+  else if (fxTabActive) startFxAnim();
+});
+document.getElementById('tab-map').addEventListener('shown.bs.tab',()=>{
+  stopFxAnim();
+  stopPovAnim();
+  updateGates();
+  startMapAnim();
+});
+document.getElementById('tab-pov').addEventListener('shown.bs.tab',()=>{
+  stopFxAnim();
+  povTabActive = true;
+  startPovAnim();
+});
+document.getElementById('tab-effects').addEventListener('shown.bs.tab',()=>{
+  cancelAnimationFrame(mapRaf);
+  stopPovAnim();
+  stopCtlAnim();
+  syncFxParamRows();
+  fxTabActive = true;
+  startFxAnim();
+});
+document.getElementById('tab-control').addEventListener('shown.bs.tab',()=>{
+  stopFxAnim();
+  stopPovAnim();
+  syncCtlChannelRows();
+  ctlTabActive = true;
+  startCtlAnim();
+});
+document.querySelectorAll('[data-bs-toggle="tab"]').forEach(btn=>{
+  btn.addEventListener('shown.bs.tab', ev=>{
+    if (ev.target.id !== 'tab-effects') stopFxAnim();
+    if (ev.target.id !== 'tab-pov') stopPovAnim();
+    if (ev.target.id !== 'tab-control') stopCtlAnim();
+  });
+});
+
+['fx','speed','mdim','mlay','mfill','mspc','mw','mh','md','scnt','dmxmode'].forEach(id=>{
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input',()=>{
+    if (id === 'fx') { syncFxParamRows(); syncCtlChannelLabels(); }
+    if (fxTabActive) startFxAnim();
+  });
+  el.addEventListener('change',()=>{
+    if (id === 'fx') { syncFxParamRows(); syncCtlChannelLabels(); }
+    if (fxTabActive) startFxAnim();
+  });
+});
+aen.addEventListener('change', () => {
+  syncDmxProtocolExclusive('aen');
+  applyLiveToFxSliders();
+  if (fxTabActive) startFxAnim();
+  scheduleFxPush();
+});
+sen.addEventListener('change', () => {
+  syncDmxProtocolExclusive('sen');
+  applyLiveToFxSliders();
+  if (fxTabActive) startFxAnim();
+  scheduleFxPush();
+});
+dmxmode.addEventListener('change', () => {
+  applyLiveToFxSliders();
+  if (fxTabActive) startFxAnim();
+  scheduleFxPush();
+});
+
+/* ---- Map formula helpers (browser-side JS) ---- */
+const MAP_FORMULA_EXAMPLE = `// Open-top box shell
+const W = 12, H = 10, D = 12;
+return boxFaces({ w: W, h: H, d: D, spacing, openTopBottom: true });
+`;
+
+function mapFormulaNormalize(pts){
+  if (!pts.length) return [];
+  let minx=Infinity,maxx=-Infinity,miny=Infinity,maxy=-Infinity,minz=Infinity,maxz=-Infinity;
+  pts.forEach(p=>{
+    if (p.x<minx)minx=p.x; if(p.x>maxx)maxx=p.x;
+    if (p.y<miny)miny=p.y; if(p.y>maxy)maxy=p.y;
+    if (p.z<minz)minz=p.z; if(p.z>maxz)maxz=p.z;
+  });
+  const s = Math.max(maxx-minx, maxy-miny, maxz-minz, 1e-6);
+  const cx = (minx + maxx) * 0.5;
+  const cy = (miny + maxy) * 0.5;
+  const cz = (minz + maxz) * 0.5;
+  return pts.map((p,i)=>({
+    i, x:(p.x-cx)/s+0.5, y:(p.y-cy)/s+0.5, z:(p.z-cz)/s+0.5, g:p.g|0
+  }));
+}
+
+function runMapFormula(src){
+  const maxN = Math.max(1, Math.min(4096, +count.value | 0));
+  const sp = Math.max(0.1, +mspc.value || 1);
+  const W = Math.max(1, +mw.value | 0);
+  const H = Math.max(1, +mh.value | 0);
+  const D = Math.max(1, +md.value | 0);
+  const out = [];
+  const api = {
+    count: maxN, spacing: sp, W, H, D,
+    push(x, y, z, g){
+      if (out.length >= maxN) return false;
+      out.push({ x:+x||0, y:+y||0, z:+z||0, g:g|0 });
+      return true;
+    },
+    normalize(pts){ return mapFormulaNormalize(pts || out); },
+    grid({ w=W, h=H, d=1, spacing:s=sp }={}){
+      const pts=[];
+      for (let z=0;z<d;z++) for(let y=0;y<h;y++) for(let x=0;x<w;x++)
+        pts.push({x:x*s,y:y*s,z:z*s});
+      return pts;
+    },
+    boxFaces({ w=W, h=H, d=D, spacing:s=sp, openTopBottom=false }={}){
+      const pts=[];
+      for (let z=0;z<d;z++) for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+        const wall = x===0||x===w-1||z===0||z===d-1;
+        const tb = y===0||y===h-1;
+        if (openTopBottom ? wall : (wall||tb)) pts.push({x:x*s,y:y*s,z:z*s});
+      }
+      return pts;
+    },
+    sphereShell({ n=maxN, spacing:s=sp }={}){
+      const radius = s * Math.sqrt(Math.max(1,n)/(4*Math.PI));
+      const ga = Math.PI*(3-Math.sqrt(5));
+      const pts=[];
+      for (let k=0;k<n;k++){
+        const t = n<=1?0:(k+0.5)/n;
+        const y = 1-2*t;
+        const r = Math.sqrt(Math.max(0,1-y*y));
+        const th = ga*k;
+        pts.push({x:Math.cos(th)*r*radius, y:y*radius, z:Math.sin(th)*r*radius});
+      }
+      return pts;
+    },
+    cylinder({ n=maxN, spacing:s=sp, openTopBottom=true }={}){
+      // Mirror firmware wall-first packing
+      const rings = Math.max(2, Math.round(Math.sqrt(n/6)));
+      const circ = Math.max(6, Math.floor(n/rings));
+      const radius = (circ*s)/(2*Math.PI);
+      const height = (rings-1)*s;
+      const pts=[];
+      for (let r=0;r<rings;r++){
+        const y = rings<=1?0:(r/(rings-1)-0.5)*height;
+        for (let c=0;c<circ && pts.length<n;c++){
+          const a = 2*Math.PI*c/circ;
+          pts.push({x:Math.cos(a)*radius,y,z:Math.sin(a)*radius});
+        }
+      }
+      if (!openTopBottom) {
+        /* caps omitted in short helper — use firmware Build for caps */
+      }
+      return pts.slice(0,n);
+    },
+    dome({ n=maxN, spacing:s=sp }={}){
+      const radius = s * Math.sqrt(Math.max(1,n)/(2*Math.PI));
+      const ga = Math.PI*(3-Math.sqrt(5));
+      const pts=[];
+      const gen = n*2+8;
+      for (let k=0;k<gen && pts.length<n;k++){
+        const t=(k+0.5)/gen, y=1-2*t;
+        if (y < -1e-4) continue;
+        const r=Math.sqrt(Math.max(0,1-y*y)), th=ga*k;
+        pts.push({x:Math.cos(th)*r*radius,y:y*radius,z:Math.sin(th)*r*radius});
+      }
+      return pts;
+    },
+    pyramid({ n=maxN, spacing:s=sp }={}){
+      // Thin wrapper: prefer Build map for full pyramid; helper gives a base ring + apex edges
+      const edge = Math.max(3, Math.round(Math.sqrt(n/5)));
+      const half = 0.5*(edge-1)*s;
+      const apexY = (edge-1)*s;
+      const corners=[[-half,0,-half],[half,0,-half],[half,0,half],[-half,0,half]];
+      const pts=[];
+      corners.forEach((a,e)=>{
+        const b=corners[(e+1)&3];
+        for(let i=0;i<edge;i++){
+          if(e>0&&i===0) continue;
+          const t=edge<=1?0:i/(edge-1);
+          pts.push({x:a[0]+(b[0]-a[0])*t,y:0,z:a[2]+(b[2]-a[2])*t});
+        }
+      });
+      corners.forEach(a=>{
+        for(let i=1;i<edge;i++){
+          const t=i/(edge-1);
+          pts.push({x:a[0]*(1-t),y:apexY*t,z:a[2]*(1-t)});
+        }
+      });
+      return pts.slice(0,n);
+    }
+  };
+  const fn = new Function(
+    'api',
+    'with(api){ ' + src + '\n; return (typeof result!=="undefined"?result:undefined); }'
+  );
+  let result = fn(api);
+  if (Array.isArray(result)) {
+    result.forEach(p => api.push(p.x, p.y, p.z, p.g));
+  }
+  if (!out.length) throw new Error('Formula produced 0 points — return an array or call push()');
+  return mapFormulaNormalize(out.slice(0, maxN));
+}
+
+async function applyMapFormula(){
+  const status = document.getElementById('mapFormulaStatus');
+  try {
+    const pts = runMapFormula(mapFormula.value);
+    map = pts;
+    mlay.value = '7';
+    mdim.value = pts.some(p => Math.abs(p.z||0) > 1e-4) ? '1' : mdim.value;
+    assignDefaultStripGroups();
+    updateGates();
+    drawMap();
+    const r = await fetch('/api/map',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(map)});
+    await saveConfig(status, r.ok
+      ? ('Formula map · ' + map.length + ' LEDs (layout=Custom). Saved.')
+      : 'Formula built locally but map save failed');
+    if (!r.ok) setStatus(mapStatus,false,'Map POST failed');
+    else setStatus(mapStatus,true,'Custom formula map · ' + map.length + ' LEDs');
+    if (fxTabActive) startFxAnim();
+    try { localStorage.setItem('pm_map_formula', mapFormula.value); } catch (_) {}
+  } catch (e) {
+    setStatus(status, false, String(e.message || e));
+    setStatus(mapStatus, false, 'Formula error: ' + (e.message || e));
+  }
+}
+
+document.getElementById('mapFormulaApply').onclick = () => applyMapFormula();
+document.getElementById('mapFormulaExample').onclick = () => {
+  mapFormula.value = MAP_FORMULA_EXAMPLE;
+};
+try {
+  const saved = localStorage.getItem('pm_map_formula');
+  if (saved) mapFormula.value = saved;
+} catch (_) {}
+
+const FX_LUA_EXAMPLE = document.getElementById('fxLua').value;
+const fxLua = document.getElementById('fxLua');
+const fxLuaStatus = document.getElementById('fxLuaStatus');
+fxLua.addEventListener('input', () => { _luaFn = null; _luaSrc = ''; });
+
+document.getElementById('fxLuaSave').onclick = () => {
+  try {
+    localStorage.setItem('pm_fx_lua', fxLua.value);
+    setStatus(fxLuaStatus, true, 'Script saved in this browser.');
+  } catch (e) {
+    setStatus(fxLuaStatus, false, 'Could not save locally');
+  }
+};
+document.getElementById('fxLuaReset').onclick = () => {
+  fxLua.value = FX_LUA_EXAMPLE;
+  _luaFn = null; _luaSrc = '';
+  setStatus(fxLuaStatus, true, 'Example restored');
+};
+document.getElementById('fxLuaSaveDevice').onclick = async () => {
+  try {
+    const r = await fetch('/api/fx/lua', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ script: fxLua.value }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok) {
+      try { localStorage.setItem('pm_fx_lua', fxLua.value); } catch (_) {}
+      _luaFn = null; _luaSrc = '';
+      fx.value = '25';
+      setStatus(fxLuaStatus, true, 'Compiled & saved to device. Effect set to Custom Lua.');
+      await saveConfig(statusEffects, 'Custom Lua selected.');
+    } else {
+      setStatus(fxLuaStatus, false, j.error || 'Compile/save failed');
+    }
+  } catch (e) {
+    setStatus(fxLuaStatus, false, 'Device unreachable');
+  }
+};
+document.getElementById('fxLuaLoadDevice').onclick = async () => {
+  try {
+    const r = await fetch('/api/fx/lua');
+    const j = await r.json();
+    if (r.ok && typeof j.script === 'string') {
+      fxLua.value = j.script;
+      _luaFn = null; _luaSrc = '';
+      setStatus(fxLuaStatus, true, j.ready ? 'Loaded from device (ready).' : ('Loaded — ' + (j.error || 'not ready')));
+    } else {
+      setStatus(fxLuaStatus, false, 'Load failed');
+    }
+  } catch (e) {
+    setStatus(fxLuaStatus, false, 'Device unreachable');
+  }
+};
+try {
+  const ls = localStorage.getItem('pm_fx_lua');
+  if (ls) fxLua.value = ls;
+} catch (_) {}
+// Prefer device script when available
+fetch('/api/fx/lua').then(r => r.ok ? r.json() : null).then(j => {
+  if (j && typeof j.script === 'string' && j.script.length) {
+    fxLua.value = j.script;
+    _luaFn = null; _luaSrc = '';
+  }
+}).catch(() => {});
+
+saveNetwork.onclick=()=>saveConfig(statusNetwork,'Saved. Reboot if Wi‑Fi changed.');
+saveStrip.onclick=async()=>{
+  await saveConfig(statusStrip,'Saved. Reboot if GPIO/chipset changed.');
+  syncStripTotal();
+  syncMapBudget();
+};
+saveEffects.onclick=()=>saveConfig(statusEffects,'Effect settings saved.');
+savePov.onclick=()=>saveConfig(statusPov,'POV settings saved.');
+saveControl.onclick=()=>saveConfig(statusControl,'Control settings saved.');
+
 buildGrid.onclick=async()=>{
+  if (wireMode) setWireMode(false);
+  syncStripTotal();
+  mspc.value = fmt1(mspc.value);
+  if (mapLayout() === 7) {
+    await applyMapFormula();
+    return;
+  }
+  const want = mapWantedCount();
+  const strip = +count.value | 0;
+  if (want > strip) {
+    setStatus(mapStatus, false, 'Shape needs ' + want + ' LEDs; strips only have ' + strip + '. Build will subsample to keep full dimensions.');
+  }
   const r=await fetch('/api/map/grid',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({w:+mw.value,h:+mh.value})});
-  if(r.ok){ await loadMap(); mapStatus.textContent='Grid built'; mapStatus.className='status ok'; }
+    body:JSON.stringify({
+      w:+mw.value, h:+mh.value, d:+md.value, dim:+mdim.value,
+      lay:mapLayout(), spc:+mspc.value, fill:+mfill.value, opentb:!!mopentb.checked
+    })});
+  const j = await r.json().catch(()=>({}));
+  if(r.ok && j.ok!==false){
+    await loadMap();
+    mapBuiltSig = mapSettingsSig();
+    assignDefaultStripGroups();
+    syncMapBudget();
+    const used = j.count ?? map.length;
+    const max = j.max ?? (+count.value | 0);
+    const unused = j.unused != null ? j.unused : Math.max(0, max - used);
+    let msg = 'Map built · ' + used + ' LEDs';
+    if (unused > 0) msg += ' · ' + unused + ' strip pixels unused';
+    msg += '. Use Edit wire order if wiring is not sequential.';
+    setStatus(mapStatus, true, msg);
+    if (fxTabActive) startFxAnim();
+  } else setStatus(mapStatus,false,'Map build failed');
 };
 saveMap.onclick=async()=>{
+  if (wireMode) applyWireAssignment(+routeStrip.value | 0);
+  // Replace unassigned markers so firmware always has valid strip indices
+  map.forEach((p, mi) => { if ((p.i | 0) >= 65535) p.i = mi; });
   const r=await fetch('/api/map',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(map)});
-  mapStatus.textContent=r.ok?'Map saved':'Map save failed';
-  mapStatus.className='status '+(r.ok?'ok':'');
+  setStatus(mapStatus,r.ok,r.ok?'Map saved (including wire order)':'Map save failed');
 };
+
+rebuildStripLenFields([60], [DEFAULT_STRIP_GPIOS[0]]);
+syncFxParamRows();
+syncCtlChannelRows();
 loadCfg().then(loadMap);
 </script>
 </body>

@@ -8,6 +8,7 @@
 #include "led_strip.h"
 #include "pixel_map.h"
 #include "effects.h"
+#include "effect_lua.h"
 #include "pov.h"
 #include "wifi_mgr.h"
 #include "web_ui.h"
@@ -18,52 +19,92 @@
 static const char *TAG = "pixelmap";
 
 static pm_app_config_t s_cfg;
-static pm_led_strip_t *s_strip;
+static pm_led_strip_t *s_buses[PM_STRIP_MAX];
+static uint8_t s_bus_count;
+static uint16_t s_bus_base[PM_STRIP_MAX];
+static uint16_t s_total_len;
 static pm_pixel_map_t *s_map;
 static uint8_t *s_dmx_merge;
 static size_t s_dmx_merge_len;
 static volatile bool s_rebuild;
 static volatile bool s_strip_fault;
 
+static void destroy_buses(void)
+{
+    for (uint8_t i = 0; i < PM_STRIP_MAX; ++i) {
+        if (s_buses[i]) {
+            pm_led_strip_destroy(s_buses[i]);
+            s_buses[i] = NULL;
+        }
+    }
+    s_bus_count = 0;
+    s_total_len = 0;
+}
+
 static void apply_correction(void)
 {
-    if (!s_strip) return;
-    pm_color_correction_t cc = *pm_led_strip_get_correction(s_strip);
-    cc.brightness = s_cfg.brightness;
-    cc.gamma = s_cfg.gamma;
-    cc.auto_white = s_cfg.auto_white;
-    /* FastLED-ish typical LED strip correction */
-    cc.correction = (pm_rgb_t){255, 224, 204};
-    cc.temperature = (pm_rgb_t){255, 255, 255};
-    pm_led_strip_set_correction(s_strip, &cc);
+    for (uint8_t i = 0; i < s_bus_count; ++i) {
+        if (!s_buses[i]) continue;
+        pm_color_correction_t cc = *pm_led_strip_get_correction(s_buses[i]);
+        cc.brightness = s_cfg.brightness;
+        cc.gamma = s_cfg.gamma;
+        cc.auto_white = s_cfg.auto_white;
+        /* FastLED-ish typical LED strip correction */
+        cc.correction = (pm_rgb_t){255, 224, 204};
+        cc.temperature = (pm_rgb_t){255, 255, 255};
+        pm_led_strip_set_correction(s_buses[i], &cc);
+    }
+}
+
+static bool resolve_bus(uint16_t global_index, pm_led_strip_t **bus, uint16_t *local)
+{
+    for (uint8_t i = 0; i < s_bus_count; ++i) {
+        uint16_t len = pm_led_strip_length(s_buses[i]);
+        if (global_index < s_bus_base[i] + len) {
+            *bus = s_buses[i];
+            *local = (uint16_t)(global_index - s_bus_base[i]);
+            return true;
+        }
+    }
+    return false;
 }
 
 static esp_err_t rebuild_strip(void)
 {
-    if (s_strip) {
-        pm_led_strip_destroy(s_strip);
-        s_strip = NULL;
+    destroy_buses();
+    pm_config_sync_strips(&s_cfg);
+
+    uint16_t base = 0;
+    esp_err_t err = ESP_OK;
+    for (uint8_t i = 0; i < s_cfg.strip_count; ++i) {
+        pm_led_strip_config_t sc = {
+            .gpio_data = s_cfg.strip_gpio[i],
+            .gpio_clock = s_cfg.gpio_clock,
+            .chipset = s_cfg.chipset,
+            .color_order = s_cfg.color_order,
+            .pixel_count = s_cfg.strip_len[i],
+            .rmt_resolution_hz_mhz = 10,
+        };
+        err = pm_led_strip_create(&sc, &s_buses[i]);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "strip %u create failed (gpio %d): %s",
+                     (unsigned)(i + 1), s_cfg.strip_gpio[i], esp_err_to_name(err));
+            destroy_buses();
+            s_strip_fault = true;
+            return err;
+        }
+        s_bus_base[i] = base;
+        base = (uint16_t)(base + s_cfg.strip_len[i]);
+        s_bus_count++;
     }
-    pm_led_strip_config_t sc = {
-        .gpio_data = s_cfg.gpio_data,
-        .gpio_clock = s_cfg.gpio_clock,
-        .chipset = s_cfg.chipset,
-        .color_order = s_cfg.color_order,
-        .pixel_count = s_cfg.pixel_count,
-        .rmt_resolution_hz_mhz = 10,
-    };
-    esp_err_t err = pm_led_strip_create(&sc, &s_strip);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "strip create failed: %s", esp_err_to_name(err));
-        s_strip_fault = true;
-        return err;
-    }
+    s_total_len = base;
     s_strip_fault = false;
     apply_correction();
 
     free(s_dmx_merge);
-    s_dmx_merge_len = (size_t)s_cfg.pixel_count * 3;
+    s_dmx_merge_len = (size_t)s_total_len * 3;
     s_dmx_merge = calloc(1, s_dmx_merge_len);
+    ESP_LOGI(TAG, "buses=%u total_leds=%u", (unsigned)s_bus_count, (unsigned)s_total_len);
     return ESP_OK;
 }
 
@@ -98,14 +139,85 @@ static void apply_pov_map_if_needed(void)
     if (!s_map || !s_cfg.pov_enable) return;
     uint16_t n = s_cfg.pixel_count > 0 ? s_cfg.pixel_count : pm_pixel_map_count(s_map);
     if (n == 0) return;
-    pm_pov_build_strip_map(s_map, n, s_cfg.pov_layout);
+    pm_pov_build_strip_map(s_map, n, s_cfg.pov_layout, s_cfg.pov_blade_count);
+}
+
+static void apply_spatial_map(void)
+{
+    if (!s_map) return;
+    if (s_cfg.pov_enable) {
+        apply_pov_map_if_needed();
+        return;
+    }
+    float sp = s_cfg.map_spacing > 1e-4f ? s_cfg.map_spacing : 1.0f;
+    uint16_t n = s_cfg.pixel_count > 0 ? s_cfg.pixel_count : 1;
+    pm_map_layout_t layout = s_cfg.map_layout;
+
+    if (s_cfg.map_dim == PM_MAP_DIM_2D && layout == PM_MAP_LAYOUT_SPHERE) {
+        layout = PM_MAP_LAYOUT_CIRCLE;
+    }
+    if (s_cfg.map_dim == PM_MAP_DIM_3D && layout == PM_MAP_LAYOUT_CIRCLE) {
+        layout = PM_MAP_LAYOUT_SPHERE;
+    }
+
+    uint8_t fill = (uint8_t)s_cfg.map_fill;
+    bool open_tb = s_cfg.map_open_tb;
+
+    if (layout == PM_MAP_LAYOUT_CUSTOM) {
+        /* Keep whatever was last imported / formula-built */
+        return;
+    }
+    uint16_t w = s_cfg.map_width > 0 ? s_cfg.map_width : 1;
+    uint16_t h = s_cfg.map_height > 0 ? s_cfg.map_height : 1;
+    uint16_t d = s_cfg.map_depth > 0 ? s_cfg.map_depth : 1;
+
+    /* 3D Grid is the same as solid Box — prefer Box path */
+    if (s_cfg.map_dim == PM_MAP_DIM_3D && layout == PM_MAP_LAYOUT_GRID) {
+        layout = PM_MAP_LAYOUT_BOX;
+        fill = 1;
+    }
+
+    if (layout == PM_MAP_LAYOUT_CIRCLE) {
+        pm_pixel_map_build_circle(s_map, w, sp, 0, n, fill);
+        pm_pixel_map_normalize_uniform(s_map);
+        return;
+    }
+    if (layout == PM_MAP_LAYOUT_SPHERE) {
+        pm_pixel_map_build_sphere(s_map, w, sp, 0, n, fill);
+        pm_pixel_map_normalize_uniform(s_map);
+        return;
+    }
+    if (layout == PM_MAP_LAYOUT_BOX) {
+        pm_pixel_map_build_box(s_map, w, h, d, sp, 0, n, fill, open_tb && fill == 0);
+        pm_pixel_map_normalize_uniform(s_map);
+        return;
+    }
+    if (layout == PM_MAP_LAYOUT_CYLINDER) {
+        pm_pixel_map_build_cylinder(s_map, w, h, sp, 0, n, open_tb);
+        pm_pixel_map_normalize_uniform(s_map);
+        return;
+    }
+    if (layout == PM_MAP_LAYOUT_DOME) {
+        pm_pixel_map_build_dome(s_map, w, sp, 0, n);
+        pm_pixel_map_normalize_uniform(s_map);
+        return;
+    }
+    if (layout == PM_MAP_LAYOUT_PYRAMID) {
+        pm_pixel_map_build_pyramid(s_map, w, h, sp, 0, n);
+        pm_pixel_map_normalize_uniform(s_map);
+        return;
+    }
+
+    /* 2D grid */
+    pm_pixel_map_build_grid(s_map, w, h, sp, 0, n);
+    pm_pixel_map_normalize_uniform(s_map);
 }
 
 static void on_config_changed(void)
 {
     s_rebuild = true;
     apply_correction();
-    apply_pov_map_if_needed();
+    apply_spatial_map();
 }
 
 static void on_map_changed(void)
@@ -116,7 +228,11 @@ static void on_map_changed(void)
 static void set_px(void *user, uint16_t strip_index, pm_rgb_t color)
 {
     (void)user;
-    pm_led_strip_set_rgb(s_strip, strip_index, color);
+    pm_led_strip_t *bus = NULL;
+    uint16_t local = 0;
+    if (resolve_bus(strip_index, &bus, &local)) {
+        pm_led_strip_set_rgb(bus, local, color);
+    }
 }
 
 static void on_dmx(uint16_t universe, const uint8_t *data, uint16_t len, void *user)
@@ -132,15 +248,27 @@ static void on_dmx(uint16_t universe, const uint8_t *data, uint16_t len, void *u
 
 static void render_from_dmx(void)
 {
-    if (!s_strip || !s_dmx_merge) return;
-    uint16_t n = pm_led_strip_length(s_strip);
-    for (uint16_t i = 0; i < n; ++i) {
+    if (!s_bus_count || !s_dmx_merge) return;
+    for (uint16_t i = 0; i < s_total_len; ++i) {
         size_t o = (size_t)i * 3;
         if (o + 2 >= s_dmx_merge_len) break;
-        pm_led_strip_set_rgb(s_strip, i, (pm_rgb_t){
+        pm_led_strip_t *bus = NULL;
+        uint16_t local = 0;
+        if (!resolve_bus(i, &bus, &local)) continue;
+        pm_led_strip_set_rgb(bus, local, (pm_rgb_t){
             s_dmx_merge[o], s_dmx_merge[o + 1], s_dmx_merge[o + 2]
         });
     }
+}
+
+static esp_err_t show_all_buses(void)
+{
+    esp_err_t err = ESP_OK;
+    for (uint8_t i = 0; i < s_bus_count; ++i) {
+        esp_err_t e = pm_led_strip_show(s_buses[i]);
+        if (e != ESP_OK) err = e;
+    }
+    return err;
 }
 
 static void render_loop(void *arg)
@@ -155,36 +283,40 @@ static void render_loop(void *arg)
         bool net = (s_cfg.artnet_enable && pm_artnet_active(1500)) ||
                    (s_cfg.sacn_enable && pm_sacn_active(1500));
 
-        if (net) {
+        if (net && s_cfg.dmx_mode == PM_DMX_MODE_PIXELS) {
             render_from_dmx();
-        } else if (s_strip && s_map) {
+        } else if (s_bus_count && s_map) {
+            pm_app_config_t fxcfg = s_cfg;
+            uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
+            if (net && s_cfg.dmx_mode == PM_DMX_MODE_PARAMS && s_dmx_merge) {
+                pm_config_apply_fx_dmx(&fxcfg, s_dmx_merge, s_dmx_merge_len);
+            }
+            /* Local modulators only when Art-Net / sACN is not enabled */
+            if (!s_cfg.artnet_enable && !s_cfg.sacn_enable) {
+                pm_config_apply_fx_mods(&fxcfg, now_ms);
+            }
+            pm_effect_params_t params;
+            pm_config_fill_effect_params(&fxcfg, &params);
             pm_effect_context_t ctx = {
                 .map = s_map,
-                .params = {
-                    .id = s_cfg.effect_id,
-                    .speed = s_cfg.effect_speed,
-                    .scale = s_cfg.effect_scale > 0 ? s_cfg.effect_scale : 1.0f,
-                    .intensity = s_cfg.effect_intensity / 255.0f,
-                    .primary = {.h = 0, .s = 255, .v = 255},
-                    .secondary = {.h = 160, .s = 255, .v = 255},
-                    .palette_blend = 0,
-                },
-                .time_ms = (uint32_t)(esp_timer_get_time() / 1000ULL),
+                .params = params,
+                .time_ms = now_ms,
                 .pov_enabled = s_cfg.pov_enable,
                 .pov = {
                     .mode = s_cfg.pov_enable ? s_cfg.pov_mode : PM_POV_OFF,
                     .layout = s_cfg.pov_layout,
+                    .blade_count = s_cfg.pov_blade_count,
                     .rpm = s_cfg.pov_rpm,
                     .linear_speed_mps = s_cfg.pov_linear_speed_mps,
                     .radius_m = s_cfg.pov_radius_m,
                     .path_length_m = s_cfg.pov_path_length_m,
                 },
-                .strip_len = pm_led_strip_length(s_strip),
+                .strip_len = s_total_len,
             };
             pm_effect_render(&ctx, set_px, NULL);
         }
 
-        if (s_strip && pm_led_strip_show(s_strip) != ESP_OK) {
+        if (s_bus_count && show_all_buses() != ESP_OK) {
             s_strip_fault = true;
         }
 
@@ -204,31 +336,31 @@ void app_main(void)
     }
 
     ESP_ERROR_CHECK(pm_config_load(&s_cfg));
+    ESP_ERROR_CHECK(pm_effect_lua_init());
 
+    int avoid[PM_STRIP_MAX + 1];
+    uint8_t avoid_n = 0;
+    for (uint8_t i = 0; i < s_cfg.strip_count && i < PM_STRIP_MAX; ++i) {
+        avoid[avoid_n++] = s_cfg.strip_gpio[i];
+    }
+    avoid[avoid_n++] = s_cfg.gpio_clock;
     pm_status_led_config_t sled = {
         .gpio = s_cfg.gpio_status_led,
         .active_high = s_cfg.status_led_active_high,
-        .avoid_gpio_a = s_cfg.gpio_data,
-        .avoid_gpio_b = s_cfg.gpio_clock,
+        .avoid_gpios = avoid,
+        .avoid_count = avoid_n,
     };
     ESP_ERROR_CHECK(pm_status_led_init(&sled));
     pm_status_led_set_mode(PM_STATUS_BOOT);
     pm_status_led_tick();
 
     pm_pixel_map_config_t mc = {
+        /* Map size is limited by strip length */
         .capacity = s_cfg.pixel_count > 0 ? s_cfg.pixel_count : 512,
         .width = 1, .height = 1, .depth = 1,
     };
-    if (mc.capacity < (uint16_t)(s_cfg.map_width * s_cfg.map_height)) {
-        mc.capacity = (uint16_t)(s_cfg.map_width * s_cfg.map_height);
-    }
     ESP_ERROR_CHECK(pm_pixel_map_create(&mc, &s_map));
-    if (s_cfg.pov_enable) {
-        apply_pov_map_if_needed();
-    } else {
-        ESP_ERROR_CHECK(pm_pixel_map_build_grid(s_map, s_cfg.map_width, s_cfg.map_height, 1.0f, 0));
-        pm_pixel_map_normalize(s_map);
-    }
+    apply_spatial_map();
 
     if (rebuild_strip() != ESP_OK) {
         pm_status_led_set_mode(PM_STATUS_FAULT_STRIP);
@@ -272,6 +404,6 @@ void app_main(void)
         ESP_ERROR_CHECK(pm_sacn_start(&sc));
     }
 
-    xTaskCreate(render_loop, "render", 8192, NULL, 6, NULL);
+    xTaskCreate(render_loop, "render", 12288, NULL, 6, NULL);
     ESP_LOGI(TAG, "PixelMap ready — open http://%s/", pm_wifi_ip_str());
 }

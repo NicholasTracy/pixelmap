@@ -106,10 +106,14 @@ esp_err_t pm_status_led_init(const pm_status_led_config_t *cfg)
         ESP_LOGI(TAG, "disabled (no pin)");
         return ESP_OK;
     }
-    if (s_gpio == cfg->avoid_gpio_a || s_gpio == cfg->avoid_gpio_b) {
-        ESP_LOGW(TAG, "GPIO %d in use for LED data/clock — status LED disabled", s_gpio);
-        s_gpio = -1;
-        return ESP_OK;
+    if (cfg->avoid_gpios) {
+        for (uint8_t i = 0; i < cfg->avoid_count; ++i) {
+            if (s_gpio == cfg->avoid_gpios[i]) {
+                ESP_LOGW(TAG, "GPIO %d in use for LED data/clock — status LED disabled", s_gpio);
+                s_gpio = -1;
+                return ESP_OK;
+            }
+        }
     }
 
     ledc_timer_config_t timer = {

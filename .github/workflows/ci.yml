@@ -35,7 +35,7 @@ jobs:
       - name: Verify components exist
         run: |
           set -euo pipefail
-          for c in led_driver color mapping effects pov wifi_mgr web_ui artnet sacn config_store status_led; do
+          for c in led_driver color mapping effects effect_lua lua pov wifi_mgr web_ui artnet sacn config_store status_led; do
             test -f "components/$c/CMakeLists.txt" || { echo "missing component: $c"; exit 1; }
           done
 

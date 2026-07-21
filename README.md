@@ -167,6 +167,38 @@ When the controller joins your normal Wi‑Fi, use the IP address shown on that 
 
 ---
 
+## Mapping layouts
+
+On the **Map** tab (when POV is off):
+
+| Control | Purpose |
+| --- | --- |
+| Dimension | 2D or 3D |
+| Layout | **Grid**, **Circle** (2D disk), or **Sphere** (3D filled volume) |
+| Circle fill | Concentric rings or filled square grid (circle layout only) |
+| Pixel spacing | Neighbor pitch — preview uses a fixed world window so spacing visibly grows the layout |
+| Width / Height / Depth | Grid lattice size only |
+| Edit wire order | Click LEDs in data-signal sequence so each map point gets the correct strip address |
+| Auto route | Axis order (all L→R / T→B / F→B permutations) plus **Start of each run** or **Zig-zag** |
+| Strip to route | When **Strip → Connected strips** is 2+, pick which strip’s wire order you are editing |
+
+On **Strip**, set **Connected strips** first. Each strip has its own **data GPIO** (WLED-style multi-bus defaults: 16, 2, 4, 13, …) and pixel count. Mapped LED count is capped by the sum of those lengths; oversized grids show a warning and are clipped.
+
+---
+
+## Built-in effects
+
+Spatial patterns sample each pixel’s mapped **X/Y/Z** (or POV world position), so the same effect works on a flat 2D grid and a 3D volume.
+
+| Group | Effects |
+| --- | --- |
+| Classic | Solid, Rainbow Spatial, Plasma, Noise Field, Radial Wave, Plane Sweep, POV Image Plane |
+| Geometric | Checkerboard, Stripes, Cartesian Grid, Box Rings, Sphere Rings, Crosshair, Diamond Lattice, Spiral, Starburst, Chevron, Helix, Axis Planes, Scan Volume, Interference, Triangle Lattice, Cubic Pulse, Polar Grid, Wave Walls |
+
+Preview any effect live on the **Effects** tab (flat plane in 2D mode, volumetric cube in 3D).
+
+---
+
 ## Persistence of vision (POV)
 
 Use this when a strip is **moving fast enough** that your eye blends the light into a 2D image — for example:
@@ -188,11 +220,14 @@ Patterns (especially **POV Image Plane**) are sampled in that world plane, so wi
 | Setting | Typical start |
 |---------|----------------|
 | Mode | Rotation (fan) or Linear (wand) |
+| Blade / strip count | 1–10 evenly spaced blades (rotation) |
 | Layout | Diameter (strip across hub) or Radius (hub → tip) |
 | RPM | Match your fan/wand spin (e.g. 600) |
 | Radius / half-span | Physical tip distance in meters (e.g. 0.25) |
 | Linear speed | Wand sweep speed in m/s (e.g. 4) |
 | Effect | POV Image Plane (or any spatial effect with POV enabled) |
+
+Total controller pixels are split evenly across blades. With 3 blades and 60 LEDs, each blade gets 20 pixels at 120° spacing.
 
 Enable **POV mapping** in the web UI, set RPM/speed to match the real mechanism, save, and spin/wave the strip.
 
@@ -302,6 +337,20 @@ PixelMap does not lock the board. To return to WLED:
 ---
 
 ## For developers
+
+### Preview the web UI on your PC (no flash required)
+
+The on-device UI lives in `components/web_ui/index.html` and talks to `/api/...` endpoints. Opening the HTML file alone is not enough — use the mock server:
+
+```bash
+python tools/web_ui_dev_server.py
+```
+
+Then open **http://127.0.0.1:8080/** in your browser.
+
+That serves the real UI and fakes config/map APIs in memory so you can tweak settings, POV fields, and the map editor before flashing. Saves do **not** reach a controller.
+
+### Build firmware (ESP-IDF)
 
 If you want to build from source with ESP-IDF v5.1+:
 
