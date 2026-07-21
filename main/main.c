@@ -312,6 +312,26 @@ static void apply_spatial_map(void)
     pm_pixel_map_normalize_uniform(s_map);
 }
 
+static void sync_audio(void)
+{
+    if (s_cfg.audio_enable) {
+        pm_audio_config_t ac = {
+            .enable = true,
+            .gpio_ws = s_cfg.audio_gpio_ws,
+            .gpio_sck = s_cfg.audio_gpio_sck,
+            .gpio_sd = s_cfg.audio_gpio_sd,
+            .gain = s_cfg.audio_gain,
+            .squelch = s_cfg.audio_squelch,
+        };
+        esp_err_t err = pm_audio_start(&ac);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "audio start failed: %s", esp_err_to_name(err));
+        }
+    } else if (pm_audio_running()) {
+        pm_audio_stop();
+    }
+}
+
 static void on_config_changed(void)
 {
     s_rebuild = true;
@@ -320,6 +340,7 @@ static void on_config_changed(void)
      * a fresh map when no persisted map exists (boot). Avoid wiping wire-order. */
     apply_wifi_from_cfg();
     sync_dmx_receivers();
+    sync_audio();
 }
 
 static void on_map_changed(void)
