@@ -60,3 +60,15 @@ Embedded single-page app (`components/web_ui/index.html`) served by `esp_http_se
 | `GET/POST /api/map` | Spatial map JSON (persisted to SPIFFS) |
 | `POST /api/map/grid` | Generate normalized lattice / shape |
 | `GET/POST /api/fx/lua` | Custom Lua effect script |
+
+## Host virtbench (CI)
+
+`tools/virtbench` builds a Linux host binary (no ESP-IDF) that links `color`, `mapping`, `pov`, `effects`, and `pm_led_encode_frame`. CI runs it to assert solid packing, color order, spatial variation, POV motion, and map builders.
+
+```bash
+cmake -S tools/virtbench -B build-virtbench
+cmake --build build-virtbench
+./build-virtbench/virtbench
+```
+
+Firmware releases: push a `v*` tag (or run the Release workflow) to publish `pixelmap-esp32-merged.bin` and `pixelmap-esp32s3-merged.bin`.

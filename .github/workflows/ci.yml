@@ -57,6 +57,26 @@ jobs:
           fi
           echo "Hygiene checks passed"
 
+  virtbench:
+    name: Virtual LED bench
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install host deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential pkg-config libcjson-dev
+
+      - name: Configure & build virtbench
+        run: |
+          cmake -S tools/virtbench -B build-virtbench
+          cmake --build build-virtbench
+
+      - name: Run virtbench
+        run: ./build-virtbench/virtbench
+
   build:
     name: Build (${{ matrix.target }})
     needs: lint
@@ -117,13 +137,15 @@ jobs:
 
   summary:
     name: CI summary
-    needs: [lint, build]
+    needs: [lint, virtbench, build]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check job results
         run: |
           echo "lint=${{ needs.lint.result }}"
+          echo "virtbench=${{ needs.virtbench.result }}"
           echo "build=${{ needs.build.result }}"
           test "${{ needs.lint.result }}" = "success"
+          test "${{ needs.virtbench.result }}" = "success"
           test "${{ needs.build.result }}" = "success"

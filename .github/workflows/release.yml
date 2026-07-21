@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag name to build (e.g. v0.1.1). Leave empty to use VERSION file."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: esp32
+            idf_version: v5.2.3
+            bootloader_offset: "0x1000"
+            flash_freq: 40m
+          - target: esp32s3
+            idf_version: v5.2.3
+            bootloader_offset: "0x0"
+            flash_freq: 80m
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: ver
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            V="${{ github.event.inputs.tag }}"
+            V="${V#v}"
+          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="$(tr -d '[:space:]' < VERSION)"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Using version $V"
+
+      - name: Build firmware
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ matrix.idf_version }}
+          target: ${{ matrix.target }}
+          path: '.'
+          command: idf.py build
+
+      - name: Create merged flash image
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: ${{ matrix.idf_version }}
+          target: ${{ matrix.target }}
+          path: '.'
+          command: >
+            esptool.py --chip ${{ matrix.target }} merge_bin
+            -o build/pixelmap-${{ matrix.target }}-merged.bin
+            --flash_mode dio --flash_freq ${{ matrix.flash_freq }} --flash_size 4MB
+            ${{ matrix.bootloader_offset }} build/bootloader/bootloader.bin
+            0x8000 build/partition_table/partition-table.bin
+            0x10000 build/pixelmap.bin
+            && cp build/pixelmap.bin build/pixelmap-${{ matrix.target }}.bin
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: |
+            build/pixelmap-${{ matrix.target }}.bin
+            build/pixelmap-${{ matrix.target }}-merged.bin
+
+  publish:
+    name: GitHub Release
+    needs: release
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+            [[ "$TAG" == v* ]] || TAG="v$TAG"
+          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="v$(tr -d '[:space:]' < VERSION)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Release tag: $TAG"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          NOTES="PixelMap ${TAG}
+
+          ## Downloads
+          - \`pixelmap-esp32-merged.bin\` — classic ESP32 (flash at 0x0)
+          - \`pixelmap-esp32s3-merged.bin\` — ESP32-S3 (flash at 0x0)
+
+          See README for install steps."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.bin --clobber
+          else
+            gh release create "$TAG" dist/*.bin --title "PixelMap ${TAG}" --notes "$NOTES"
+          fi

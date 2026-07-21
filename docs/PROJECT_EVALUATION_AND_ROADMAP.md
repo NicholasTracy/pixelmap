@@ -254,11 +254,11 @@ Phases are sequential enough to ship value; items within a phase can parallelize
 
 **Goal:** CI proves pixel output; releases are push-button.
 
-- [ ] `tools/virtbench` host harness + golden frames (see prior plan)  
-- [ ] CI job `virtbench` gating merge  
+- [x] `tools/virtbench` host harness (map → effect → encode assertions)  
+- [x] CI job `virtbench` gating merge  
 - [ ] Mock server smoke (config/map roundtrip)  
-- [ ] `.github/workflows/release.yml` on tag: build both targets, attach merged bins, use `VERSION`  
-- [ ] Expose version in `/api/config` + UI footer  
+- [x] `.github/workflows/release.yml` on tag: build both targets, attach merged bins  
+- [x] Expose version in `/api/config` (`ver` from `VERSION` file via CMake)  
 
 **Exit:** Broken effect/pack changes fail CI; GitHub Release matches README filenames.
 
