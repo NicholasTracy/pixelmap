@@ -1,10 +1,27 @@
 #include "config_store.h"
 #include "nvs_flash.h"
 #include "nvs.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
+
+static SemaphoreHandle_t s_cfg_mtx;
+
+void pm_config_lock(void)
+{
+    if (!s_cfg_mtx) {
+        s_cfg_mtx = xSemaphoreCreateMutex();
+    }
+    if (s_cfg_mtx) xSemaphoreTake(s_cfg_mtx, portMAX_DELAY);
+}
+
+void pm_config_unlock(void)
+{
+    if (s_cfg_mtx) xSemaphoreGive(s_cfg_mtx);
+}
 
 static float clampf(float v, float lo, float hi)
 {
@@ -137,6 +154,9 @@ void pm_config_set_defaults(pm_app_config_t *cfg)
     cfg->universe_count = 4;
     cfg->artnet_enable = false;
     cfg->sacn_enable = false;
+    cfg->sacn_min_priority = 0;
+    cfg->ui_pin[0] = '\0';
+    cfg->ma_per_led = 60;
     cfg->map_width = 10;
     cfg->map_height = 6;
     cfg->map_depth = 1;
@@ -295,6 +315,10 @@ void pm_config_sync_strips(pm_app_config_t *cfg)
     if (!cfg) return;
     if (cfg->strip_count < 1) cfg->strip_count = 1;
     if (cfg->strip_count > PM_STRIP_MAX) cfg->strip_count = PM_STRIP_MAX;
+    /* APA102/SK9822 share SPI2 — single strip only for now. */
+    if (pm_chipset_timing(cfg->chipset)->protocol == PM_BUS_PROTOCOL_SPI_CLOCKED) {
+        cfg->strip_count = 1;
+    }
     uint32_t sum = 0;
     for (uint8_t i = 0; i < PM_STRIP_MAX; ++i) {
         if (i >= cfg->strip_count) {
@@ -317,9 +341,7 @@ void pm_config_sync_strips(pm_app_config_t *cfg)
 
 static void coerce_unsupported_chipset(pm_app_config_t *cfg)
 {
-    /* APA102/SK9822 SPI path is not implemented yet — fall back safely. */
-    if (cfg->chipset == PM_CHIPSET_APA102 || cfg->chipset == PM_CHIPSET_SK9822 ||
-        cfg->chipset == PM_CHIPSET_CUSTOM) {
+    if (cfg->chipset == PM_CHIPSET_CUSTOM) {
         cfg->chipset = PM_CHIPSET_WS2812B;
     }
 }
@@ -428,6 +450,20 @@ esp_err_t pm_config_load(pm_app_config_t *cfg)
     if (nvs_get_i32(h, "aen", &v) == ESP_OK) cfg->artnet_enable = v != 0;
     if (nvs_get_i32(h, "sen", &v) == ESP_OK) cfg->sacn_enable = v != 0;
     if (cfg->artnet_enable && cfg->sacn_enable) cfg->sacn_enable = false;
+    if (nvs_get_i32(h, "sminp", &v) == ESP_OK) {
+        if (v < 0) v = 0;
+        if (v > 200) v = 200;
+        cfg->sacn_min_priority = (uint8_t)v;
+    }
+    {
+        size_t len = sizeof(cfg->ui_pin);
+        nvs_get_str(h, "uipin", cfg->ui_pin, &len);
+    }
+    if (nvs_get_i32(h, "maled", &v) == ESP_OK) {
+        if (v < 1) v = 1;
+        if (v > 1000) v = 1000;
+        cfg->ma_per_led = (uint16_t)v;
+    }
     if (nvs_get_i32(h, "mw", &v) == ESP_OK) cfg->map_width = (uint16_t)v;
     if (nvs_get_i32(h, "mh", &v) == ESP_OK) cfg->map_height = (uint16_t)v;
     if (nvs_get_i32(h, "md", &v) == ESP_OK) cfg->map_depth = (uint16_t)v;
@@ -509,6 +545,9 @@ esp_err_t pm_config_save(const pm_app_config_t *cfg)
     nvs_set_i32(h, "ucnt", cfg->universe_count);
     nvs_set_i32(h, "aen", cfg->artnet_enable ? 1 : 0);
     nvs_set_i32(h, "sen", cfg->sacn_enable ? 1 : 0);
+    nvs_set_i32(h, "sminp", cfg->sacn_min_priority);
+    nvs_set_str(h, "uipin", cfg->ui_pin);
+    nvs_set_i32(h, "maled", cfg->ma_per_led);
     nvs_set_i32(h, "mw", cfg->map_width);
     nvs_set_i32(h, "mh", cfg->map_height);
     nvs_set_i32(h, "md", cfg->map_depth);
@@ -528,4 +567,17 @@ esp_err_t pm_config_save(const pm_app_config_t *cfg)
     err = nvs_commit(h);
     nvs_close(h);
     return err;
+}
+
+esp_err_t pm_config_factory_reset_nvs(void)
+{
+    static const char *nss[] = {NS, "pm_lua", "pm_preset"};
+    for (size_t i = 0; i < sizeof(nss) / sizeof(nss[0]); ++i) {
+        nvs_handle_t h;
+        if (nvs_open(nss[i], NVS_READWRITE, &h) != ESP_OK) continue;
+        nvs_erase_all(h);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+    return ESP_OK;
 }

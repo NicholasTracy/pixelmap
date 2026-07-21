@@ -68,7 +68,7 @@ jobs:
             --flash_mode dio --flash_freq ${{ matrix.flash_freq }} --flash_size 4MB
             ${{ matrix.bootloader_offset }} build/bootloader/bootloader.bin
             0x8000 build/partition_table/partition-table.bin
-            0x10000 build/pixelmap.bin
+            0x20000 build/pixelmap.bin
             && cp build/pixelmap.bin build/pixelmap-${{ matrix.target }}.bin
 
       - name: Upload build artifact

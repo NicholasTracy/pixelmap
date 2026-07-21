@@ -3,6 +3,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "mdns.h"
 #include "nvs_flash.h"
 #include <string.h>
 #include <stdio.h>
@@ -142,6 +143,21 @@ esp_err_t pm_wifi_apply(const pm_wifi_config_t *cfg)
         start_ap();
         ESP_LOGI(TAG, "STA cleared; AP fallback active");
     }
+    return ESP_OK;
+}
+
+esp_err_t pm_wifi_mdns_start(const char *hostname)
+{
+    const char *host = (hostname && hostname[0]) ? hostname : "pixelmap";
+    esp_err_t err = mdns_init();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "mdns_init: %s", esp_err_to_name(err));
+        return err;
+    }
+    mdns_hostname_set(host);
+    mdns_instance_name_set("PixelMap");
+    mdns_service_add("PixelMap", "_http", "_tcp", 80, NULL, 0);
+    ESP_LOGI(TAG, "mDNS http://%s.local/", host);
     return ESP_OK;
 }
 

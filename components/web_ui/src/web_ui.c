@@ -2,12 +2,18 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_check.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "cJSON.h"
 #include "led_chipsets.h"
 #include "color_engine.h"
 #include "pm_version.h"
 #include "pov.h"
 #include "effect_lua.h"
+#include "ota_update.h"
+#include "presets.h"
+#include "map_store.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -34,6 +40,35 @@ static esp_err_t send_json(httpd_req_t *req, cJSON *obj)
     esp_err_t err = httpd_resp_send(req, s, strlen(s));
     free(s);
     return err;
+}
+
+static bool pin_ok(httpd_req_t *req)
+{
+    pm_app_config_t *c = s_hooks.cfg;
+    if (!c || !c->ui_pin[0]) return true;
+    char hdr[16] = {0};
+    if (httpd_req_get_hdr_value_str(req, "X-PixelMap-Pin", hdr, sizeof(hdr)) != ESP_OK) {
+        return false;
+    }
+    return strcmp(hdr, c->ui_pin) == 0;
+}
+
+static esp_err_t reject_pin(httpd_req_t *req)
+{
+    httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "pin required");
+    return ESP_FAIL;
+}
+
+static void reboot_soon_task(void *arg)
+{
+    (void)arg;
+    vTaskDelay(pdMS_TO_TICKS(600));
+    esp_restart();
+}
+
+static void schedule_reboot(void)
+{
+    xTaskCreate(reboot_soon_task, "reboot", 2048, NULL, 5, NULL);
 }
 
 static cJSON *read_body_json(httpd_req_t *req)
@@ -83,12 +118,17 @@ static esp_err_t h_bootstrap_js(httpd_req_t *req)
 static esp_err_t h_get_config(httpd_req_t *req)
 {
     pm_app_config_t *c = s_hooks.cfg;
+    pm_config_lock();
     cJSON *o = cJSON_CreateObject();
     cJSON_AddStringToObject(o, "ver", PIXELMAP_VERSION);
     cJSON_AddStringToObject(o, "ssid", c->sta_ssid);
     /* Never echo Wi‑Fi password; UI only sends a new pass when the user types one. */
     cJSON_AddBoolToObject(o, "passSet", c->sta_pass[0] != '\0');
+    cJSON_AddBoolToObject(o, "pinSet", c->ui_pin[0] != '\0');
     cJSON_AddStringToObject(o, "host", c->hostname);
+    cJSON_AddStringToObject(o, "otaPart", pm_ota_running_label());
+    cJSON_AddNumberToObject(o, "maled", c->ma_per_led);
+    cJSON_AddNumberToObject(o, "sminp", c->sacn_min_priority);
     cJSON_AddNumberToObject(o, "gpio", c->gpio_data);
     cJSON_AddNumberToObject(o, "clk", c->gpio_clock);
     cJSON_AddNumberToObject(o, "sled", c->gpio_status_led);
@@ -171,17 +211,20 @@ static esp_err_t h_get_config(httpd_req_t *req)
     cJSON_AddNumberToObject(o, "povspd", c->pov_linear_speed_mps);
     cJSON_AddNumberToObject(o, "povrad", c->pov_radius_m);
     cJSON_AddNumberToObject(o, "povpath", c->pov_path_length_m);
+    pm_config_unlock();
     return send_json(req, o);
 }
 
 static esp_err_t h_post_config(httpd_req_t *req)
 {
+    if (!pin_ok(req)) return reject_pin(req);
     cJSON *j = read_body_json(req);
     if (!j) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad json");
         return ESP_FAIL;
     }
     pm_app_config_t *c = s_hooks.cfg;
+    pm_config_lock();
     cJSON *v;
     if ((v = cJSON_GetObjectItem(j, "ssid")) && cJSON_IsString(v))
         strncpy(c->sta_ssid, v->valuestring, sizeof(c->sta_ssid) - 1);
@@ -226,8 +269,7 @@ static esp_err_t h_post_config(httpd_req_t *req)
     if ((v = cJSON_GetObjectItem(j, "aw"))) c->auto_white = cJSON_IsTrue(v);
     if ((v = cJSON_GetObjectItem(j, "chip")) && cJSON_IsString(v)) {
         c->chipset = pm_chipset_from_name(v->valuestring);
-        if (c->chipset == PM_CHIPSET_APA102 || c->chipset == PM_CHIPSET_SK9822 ||
-            c->chipset == PM_CHIPSET_CUSTOM) {
+        if (c->chipset == PM_CHIPSET_CUSTOM) {
             c->chipset = PM_CHIPSET_WS2812B;
         }
     }
@@ -355,6 +397,23 @@ static esp_err_t h_post_config(httpd_req_t *req)
         if (uv > 16) uv = 16;
         c->universe_count = (uint16_t)uv;
     }
+    if ((v = cJSON_GetObjectItem(j, "sminp")) && cJSON_IsNumber(v)) {
+        int p = (int)v->valuedouble;
+        if (p < 0) p = 0;
+        if (p > 200) p = 200;
+        c->sacn_min_priority = (uint8_t)p;
+    }
+    if ((v = cJSON_GetObjectItem(j, "maled")) && cJSON_IsNumber(v)) {
+        int m = (int)v->valuedouble;
+        if (m < 1) m = 1;
+        if (m > 1000) m = 1000;
+        c->ma_per_led = (uint16_t)m;
+    }
+    /* Empty string clears PIN; omit keeps current. */
+    if ((v = cJSON_GetObjectItem(j, "uipin")) && cJSON_IsString(v)) {
+        strncpy(c->ui_pin, v->valuestring, sizeof(c->ui_pin) - 1);
+        c->ui_pin[sizeof(c->ui_pin) - 1] = '\0';
+    }
     /* Only one protocol at a time */
     if (c->artnet_enable && c->sacn_enable) c->sacn_enable = false;
     if ((v = cJSON_GetObjectItem(j, "mw")) && cJSON_IsNumber(v)) c->map_width = (uint16_t)v->valuedouble;
@@ -379,6 +438,7 @@ static esp_err_t h_post_config(httpd_req_t *req)
     cJSON_Delete(j);
 
     pm_config_save(c);
+    pm_config_unlock();
     if (s_hooks.on_config_changed) s_hooks.on_config_changed();
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_sendstr(req, "{\"ok\":true}");
@@ -404,6 +464,7 @@ static esp_err_t h_get_map(httpd_req_t *req)
 
 static esp_err_t h_post_map(httpd_req_t *req)
 {
+    if (!pin_ok(req)) return reject_pin(req);
     cJSON *j = read_body_json(req);
     if (!j) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad json");
@@ -425,6 +486,7 @@ static esp_err_t h_post_map(httpd_req_t *req)
 
 static esp_err_t h_post_grid(httpd_req_t *req)
 {
+    if (!pin_ok(req)) return reject_pin(req);
     cJSON *j = read_body_json(req);
     if (!j) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad json");
@@ -464,6 +526,7 @@ static esp_err_t h_post_grid(httpd_req_t *req)
     }
     if (fill != 0) open_tb = false; /* solid has no open top/bottom */
 
+    pm_config_lock();
     uint16_t max_n = s_hooks.cfg->pixel_count > 0 ? s_hooks.cfg->pixel_count : 1;
     esp_err_t err = ESP_OK;
 
@@ -499,10 +562,13 @@ static esp_err_t h_post_grid(httpd_req_t *req)
         s_hooks.cfg->map_open_tb = open_tb;
         s_hooks.cfg->map_spacing = sp;
         pm_config_save(s_hooks.cfg);
-        if (s_hooks.on_map_changed) s_hooks.on_map_changed();
-        if (s_hooks.on_config_changed) s_hooks.on_config_changed();
     } else {
         used = pm_pixel_map_count(s_hooks.map);
+    }
+    pm_config_unlock();
+    if (err == ESP_OK && layout != PM_MAP_LAYOUT_CUSTOM) {
+        if (s_hooks.on_map_changed) s_hooks.on_map_changed();
+        if (s_hooks.on_config_changed) s_hooks.on_config_changed();
     }
 
     unsigned unused = max_n > used ? (unsigned)(max_n - used) : 0;
@@ -527,6 +593,7 @@ static esp_err_t h_get_fx_lua(httpd_req_t *req)
 
 static esp_err_t h_post_fx_lua(httpd_req_t *req)
 {
+    if (!pin_ok(req)) return reject_pin(req);
     cJSON *j = read_body_json(req);
     if (!j) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad json");
@@ -551,12 +618,148 @@ static esp_err_t h_post_fx_lua(httpd_req_t *req)
     return send_json(req, o);
 }
 
+static esp_err_t h_get_ota(httpd_req_t *req)
+{
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddStringToObject(o, "part", pm_ota_running_label());
+    cJSON_AddBoolToObject(o, "busy", pm_ota_in_progress());
+    return send_json(req, o);
+}
+
+static esp_err_t h_post_ota(httpd_req_t *req)
+{
+    if (!pin_ok(req)) return reject_pin(req);
+    if (req->content_len <= 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "empty body");
+        return ESP_FAIL;
+    }
+    esp_err_t err = pm_ota_begin((size_t)req->content_len);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+
+    uint8_t buf[2048];
+    int remaining = req->content_len;
+    while (remaining > 0) {
+        int to_read = remaining > (int)sizeof(buf) ? (int)sizeof(buf) : remaining;
+        int r = httpd_req_recv(req, (char *)buf, to_read);
+        if (r <= 0) {
+            pm_ota_abort();
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "recv");
+            return ESP_FAIL;
+        }
+        err = pm_ota_write(buf, (size_t)r);
+        if (err != ESP_OK) {
+            pm_ota_abort();
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(err));
+            return ESP_FAIL;
+        }
+        remaining -= r;
+    }
+
+    err = pm_ota_finish();
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"ok\":true,\"reboot\":true}");
+    schedule_reboot();
+    return ESP_OK;
+}
+
+static esp_err_t h_get_presets(httpd_req_t *req)
+{
+    cJSON *o = cJSON_CreateObject();
+    cJSON *arr = cJSON_CreateArray();
+    for (int i = 0; i < PM_PRESET_SLOTS; ++i) {
+        const pm_preset_t *p = pm_presets_get((uint8_t)i);
+        cJSON *slot = cJSON_CreateObject();
+        cJSON_AddNumberToObject(slot, "slot", i);
+        cJSON_AddBoolToObject(slot, "used", p && p->used);
+        cJSON_AddStringToObject(slot, "name", (p && p->used) ? p->name : "");
+        cJSON_AddItemToArray(arr, slot);
+    }
+    cJSON_AddItemToObject(o, "slots", arr);
+    return send_json(req, o);
+}
+
+static esp_err_t h_post_presets(httpd_req_t *req)
+{
+    if (!pin_ok(req)) return reject_pin(req);
+    cJSON *j = read_body_json(req);
+    if (!j) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad json");
+        return ESP_FAIL;
+    }
+    cJSON *act = cJSON_GetObjectItem(j, "action");
+    cJSON *slotj = cJSON_GetObjectItem(j, "slot");
+    if (!act || !cJSON_IsString(act) || !slotj || !cJSON_IsNumber(slotj)) {
+        cJSON_Delete(j);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "action/slot");
+        return ESP_FAIL;
+    }
+    int slot = (int)slotj->valuedouble;
+    if (slot < 0 || slot >= PM_PRESET_SLOTS) {
+        cJSON_Delete(j);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "slot");
+        return ESP_FAIL;
+    }
+    char action[16] = {0};
+    strncpy(action, act->valuestring, sizeof(action) - 1);
+    cJSON *name = cJSON_GetObjectItem(j, "name");
+    char namebuf[PM_PRESET_NAME_MAX] = {0};
+    if (name && cJSON_IsString(name) && name->valuestring) {
+        strncpy(namebuf, name->valuestring, sizeof(namebuf) - 1);
+    }
+    cJSON_Delete(j);
+
+    esp_err_t err = ESP_FAIL;
+    bool applied = false;
+    pm_config_lock();
+    if (strcmp(action, "save") == 0) {
+        err = pm_presets_save_slot((uint8_t)slot, namebuf[0] ? namebuf : NULL, s_hooks.cfg);
+    } else if (strcmp(action, "apply") == 0) {
+        err = pm_presets_apply_slot((uint8_t)slot, s_hooks.cfg);
+        if (err == ESP_OK) {
+            pm_config_save(s_hooks.cfg);
+            applied = true;
+        }
+    } else if (strcmp(action, "clear") == 0) {
+        err = pm_presets_clear_slot((uint8_t)slot);
+    } else {
+        err = ESP_ERR_INVALID_ARG;
+    }
+    pm_config_unlock();
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+    if (applied && s_hooks.on_config_changed) {
+        s_hooks.on_config_changed();
+    }
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
+}
+
+static esp_err_t h_post_factory_reset(httpd_req_t *req)
+{
+    if (!pin_ok(req)) return reject_pin(req);
+    pm_config_factory_reset_nvs();
+    pm_map_store_erase();
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"ok\":true,\"reboot\":true}");
+    schedule_reboot();
+    return ESP_OK;
+}
+
 esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
 {
     if (!hooks || !hooks->cfg || !hooks->map) return ESP_ERR_INVALID_ARG;
     s_hooks = *hooks;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 20;
+    config.max_uri_handlers = 24;
     config.stack_size = 8192;
     ESP_RETURN_ON_ERROR(httpd_start(&s_server, &config), TAG, "httpd");
 
@@ -571,6 +774,11 @@ esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
         {.uri = "/api/map/grid", .method = HTTP_POST, .handler = h_post_grid},
         {.uri = "/api/fx/lua", .method = HTTP_GET, .handler = h_get_fx_lua},
         {.uri = "/api/fx/lua", .method = HTTP_POST, .handler = h_post_fx_lua},
+        {.uri = "/api/ota", .method = HTTP_GET, .handler = h_get_ota},
+        {.uri = "/api/ota", .method = HTTP_POST, .handler = h_post_ota},
+        {.uri = "/api/presets", .method = HTTP_GET, .handler = h_get_presets},
+        {.uri = "/api/presets", .method = HTTP_POST, .handler = h_post_presets},
+        {.uri = "/api/factory_reset", .method = HTTP_POST, .handler = h_post_factory_reset},
     };
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); ++i) {
         httpd_register_uri_handler(s_server, &routes[i]);

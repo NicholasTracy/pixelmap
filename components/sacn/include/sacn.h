@@ -14,6 +14,8 @@ typedef struct {
     uint16_t universe_start;
     uint16_t universe_count;
     bool join_multicast;
+    /** Minimum accepted E1.31 priority (0–200). Packets below are ignored. */
+    uint8_t min_priority;
     pm_sacn_dmx_cb_t on_dmx;
     void *user;
 } pm_sacn_config_t;

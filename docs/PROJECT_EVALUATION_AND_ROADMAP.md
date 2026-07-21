@@ -1,7 +1,7 @@
 # PixelMap — Project Evaluation & Roadmap
 
 **Status:** Living document for agents and maintainers  
-**Evaluated:** 2026-07-21 (updated same day — Phase 0 + Phase 1 core landed)  
+**Evaluated:** 2026-07-21 (updated — Phase 3 product features landed)  
 **Version at evaluation:** `0.1.0` (`VERSION`)  
 **Repo:** https://github.com/NicholasTracy/pixelmap  
 **Companion canvas:** open beside chat as `project-evaluation-roadmap.canvas.tsx` in the Cursor project canvases folder
@@ -76,7 +76,7 @@ Severity: **P0** = crash/data loss/broken claim in common path · **P1** = silen
 | F5 | Map capacity fixed at create from initial `pixel_count`; growing strips does not resize map | `main.c` map create | Destroy/recreate map (or grow) on strip rebuild |
 | F6 | `s_dmx_merge` calloc unchecked | `main.c` rebuild | Check NULL; set fault mode |
 | F7 | Rebuild failure ignored in render loop | `main.c` | Surface fault; avoid calling show on null buses inconsistently |
-| F8 | Shared `s_cfg` / map mutated from HTTP without lock vs render task | `web_ui.c` + `main.c` | Snapshot config under mutex, or double-buffer map |
+| F8 | ~~Shared `s_cfg` without lock~~ **Mitigated** | Config mutex + render snapshot | Map still shared; double-buffer later |
 | F9 | Art-Net pixel merge is RGB×3 only into RGBW hardware | `main.c` `render_from_dmx` | Document or expand channel modes |
 | F10 | RGBWW helpers exist but **no chipset sets 5 channels** | `led_chipsets.c`, README claims | Add chipset or soften README |
 | F11 | Color order / clock / auto_white / universe_count in NVS but weak/missing UI+API | `web_ui.c`, Strip/Control tabs | Expose in GET/POST config + UI |
@@ -266,16 +266,16 @@ Phases are sequential enough to ship value; items within a phase can parallelize
 
 **Goal:** Installable, updatable, discoverable controller.
 
-- [ ] Repartition for OTA (reclaim unused storage as needed) + web OTA UI  
-- [ ] APA102/SK9822 real SPI path + clock GPIO  
-- [ ] mDNS; ArtPollReply; sACN priority  
-- [ ] Presets (effect+params; optional map link)  
-- [ ] Factory reset (button + UI)  
-- [ ] Optional UI PIN  
-- [ ] Power estimate / brightness clamp guidance  
-- [ ] Thread-safe config snapshot  
+- [x] Repartition for OTA (`ota_0`/`ota_1` @ `0x20000`) + web OTA UI (`POST /api/ota`)  
+- [x] APA102/SK9822 real SPI path + clock GPIO (single strip)  
+- [x] mDNS; ArtPollReply; sACN priority + min priority  
+- [x] Presets (effect+params; 4 NVS slots)  
+- [x] Factory reset (UI; button hold still open)  
+- [x] Optional UI PIN (`X-PixelMap-Pin`)  
+- [x] Power estimate / brightness guidance in Strip UI  
+- [x] Thread-safe config snapshot (mutex + render copy)  
 
-**Exit:** Tag `v1.0.0` — WS281x + optional APA102, OTA, persistent maps, CI goldens, automated release.
+**Exit:** Tag `v1.0.0` — WS281x + optional APA102, OTA, persistent maps, CI goldens, automated release. Core Phase 3 landed 2026-07-21; tag when CI + field soak look good.
 
 ### Phase 4 — Differentiated 1.x (ongoing)
 
@@ -316,12 +316,13 @@ If only a few items can be done next, do them in this order:
 | effects | High | Solid; Lua path heavier |
 | pov | High | Fixed RPM/speed by design |
 | color | High | RGBWW unused by chipsets |
-| led_driver | Medium | WS281x good; SPI stub |
-| config_store | Medium | Scalars good; no map blob |
+| led_driver | Medium–High | WS281x + APA102 SPI (1 strip) |
+| config_store | Medium–High | Scalars + mutex; map via map_store |
 | effect_lua | Medium | Usable sandbox; no heap cap |
-| web_ui | Medium–High | Deep UX; API field gaps |
-| wifi_mgr | Basic | Works; no mDNS/hot reconfig |
-| artnet / sacn | Basic | Receive-only MVP |
+| web_ui | High | OTA, presets, PIN, power est |
+| wifi_mgr | Medium | Hot apply + mDNS |
+| artnet / sacn | Medium | ArtPollReply + sACN priority |
+| ota_update / presets | Medium | Wired to HTTP UI |
 | status_led | High | One unused mode |
 | boards | Docs-only | Not integrated |
 | lua (vendor) | Vendor | Trimmed libs |

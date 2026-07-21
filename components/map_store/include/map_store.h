@@ -10,6 +10,8 @@ extern "C" {
 esp_err_t pm_map_store_mount(void);
 esp_err_t pm_map_store_save(const pm_pixel_map_t *map);
 esp_err_t pm_map_store_load(pm_pixel_map_t *map);
+/** Erase persisted map blob (factory reset). */
+esp_err_t pm_map_store_erase(void);
 
 #ifdef __cplusplus
 }

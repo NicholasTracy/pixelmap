@@ -14,6 +14,8 @@ typedef struct {
     uint16_t listen_port;     /* default 6454 */
     uint16_t universe_start;  /* first universe mapped to pixel 0 */
     uint16_t universe_count;
+    const char *short_name;   /* ArtPollReply short name (≤17) */
+    const char *long_name;    /* ArtPollReply long name (≤63) */
     pm_artnet_dmx_cb_t on_dmx;
     void *user;
 } pm_artnet_config_t;

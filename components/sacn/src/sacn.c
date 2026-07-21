@@ -19,6 +19,8 @@ static TaskHandle_t s_task;
 static int s_sock = -1;
 static pm_sacn_config_t s_cfg;
 static int64_t s_last_us;
+static uint8_t s_active_priority;
+static int64_t s_priority_hold_us;
 
 static uint16_t be16(const uint8_t *p) { return (uint16_t)((p[0] << 8) | p[1]); }
 
@@ -59,7 +61,21 @@ static void sacn_task(void *arg)
             continue;
         }
 
-        s_last_us = esp_timer_get_time();
+        /* E1.31 framing layer priority at byte 108 */
+        uint8_t priority = buf[108];
+        if (priority > 200) priority = 200;
+        if (priority < s_cfg.min_priority) continue;
+
+        int64_t now = esp_timer_get_time();
+        if (s_priority_hold_us > 0 && now < s_priority_hold_us && priority < s_active_priority) {
+            continue;
+        }
+        if (priority >= s_active_priority || now >= s_priority_hold_us) {
+            s_active_priority = priority;
+            s_priority_hold_us = now + 1500000; /* ~1.5 s HTP hold */
+        }
+
+        s_last_us = now;
         if (s_cfg.on_dmx) {
             s_cfg.on_dmx(universe, dmx, dmx_len, s_cfg.user);
         }
@@ -72,6 +88,8 @@ esp_err_t pm_sacn_start(const pm_sacn_config_t *cfg)
     if (s_task) return ESP_ERR_INVALID_STATE;
     s_cfg = *cfg;
     if (s_cfg.universe_count == 0) s_cfg.universe_count = 4;
+    s_active_priority = 0;
+    s_priority_hold_us = 0;
 
     s_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (s_sock < 0) return ESP_FAIL;

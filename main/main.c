@@ -16,9 +16,9 @@
 #include "artnet.h"
 #include "sacn.h"
 #include "status_led.h"
+#include "presets.h"
 
 static const char *TAG = "pixelmap";
-static const char *MAP_PATH = "/spiffs/map.json";
 
 static pm_app_config_t s_cfg;
 static pm_led_strip_t *s_buses[PM_STRIP_MAX];
@@ -155,6 +155,8 @@ static void sync_dmx_receivers(void)
             .listen_port = 6454,
             .universe_start = s_cfg.artnet_universe,
             .universe_count = s_cfg.universe_count,
+            .short_name = s_cfg.hostname[0] ? s_cfg.hostname : "PixelMap",
+            .long_name = "PixelMap LED Controller",
             .on_dmx = on_dmx,
             .user = &s_cfg.artnet_universe,
         };
@@ -175,6 +177,7 @@ static void sync_dmx_receivers(void)
             .universe_start = s_cfg.sacn_universe,
             .universe_count = s_cfg.universe_count,
             .join_multicast = true,
+            .min_priority = s_cfg.sacn_min_priority,
             .on_dmx = on_dmx,
             .user = &s_cfg.sacn_universe,
         };
@@ -199,6 +202,7 @@ static void apply_wifi_from_cfg(void)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "wifi apply failed: %s", esp_err_to_name(err));
     }
+    pm_wifi_mdns_start(s_cfg.hostname);
 }
 
 static void update_status_led(bool dmx_active)
@@ -376,19 +380,23 @@ static void render_loop(void *arg)
             rebuild_strip();
         }
 
-        bool net = (s_cfg.artnet_enable && pm_artnet_active(1500)) ||
-                   (s_cfg.sacn_enable && pm_sacn_active(1500));
+        pm_config_lock();
+        pm_app_config_t cfg = s_cfg;
+        pm_config_unlock();
 
-        if (net && s_cfg.dmx_mode == PM_DMX_MODE_PIXELS) {
+        bool net = (cfg.artnet_enable && pm_artnet_active(1500)) ||
+                   (cfg.sacn_enable && pm_sacn_active(1500));
+
+        if (net && cfg.dmx_mode == PM_DMX_MODE_PIXELS) {
             render_from_dmx();
         } else if (s_bus_count && s_map) {
-            pm_app_config_t fxcfg = s_cfg;
+            pm_app_config_t fxcfg = cfg;
             uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
-            if (net && s_cfg.dmx_mode == PM_DMX_MODE_PARAMS && s_dmx_merge) {
+            if (net && cfg.dmx_mode == PM_DMX_MODE_PARAMS && s_dmx_merge) {
                 pm_config_apply_fx_dmx(&fxcfg, s_dmx_merge, s_dmx_merge_len);
             }
             /* Local modulators only when Art-Net / sACN is not enabled */
-            if (!s_cfg.artnet_enable && !s_cfg.sacn_enable) {
+            if (!cfg.artnet_enable && !cfg.sacn_enable) {
                 pm_config_apply_fx_mods(&fxcfg, now_ms);
             }
             pm_effect_params_t params;
@@ -397,15 +405,15 @@ static void render_loop(void *arg)
                 .map = s_map,
                 .params = params,
                 .time_ms = now_ms,
-                .pov_enabled = s_cfg.pov_enable,
+                .pov_enabled = cfg.pov_enable,
                 .pov = {
-                    .mode = s_cfg.pov_enable ? s_cfg.pov_mode : PM_POV_OFF,
-                    .layout = s_cfg.pov_layout,
-                    .blade_count = s_cfg.pov_blade_count,
-                    .rpm = s_cfg.pov_rpm,
-                    .linear_speed_mps = s_cfg.pov_linear_speed_mps,
-                    .radius_m = s_cfg.pov_radius_m,
-                    .path_length_m = s_cfg.pov_path_length_m,
+                    .mode = cfg.pov_enable ? cfg.pov_mode : PM_POV_OFF,
+                    .layout = cfg.pov_layout,
+                    .blade_count = cfg.pov_blade_count,
+                    .rpm = cfg.pov_rpm,
+                    .linear_speed_mps = cfg.pov_linear_speed_mps,
+                    .radius_m = cfg.pov_radius_m,
+                    .path_length_m = cfg.pov_path_length_m,
                 },
                 .strip_len = s_total_len,
             };
@@ -439,6 +447,9 @@ void app_main(void)
     err = pm_effect_lua_init();
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "lua init failed: %s", esp_err_to_name(err));
+    }
+    if (pm_presets_load() != ESP_OK) {
+        ESP_LOGW(TAG, "presets load failed");
     }
 
     pm_map_store_mount();
@@ -482,6 +493,7 @@ void app_main(void)
         .ap_fallback = s_cfg.ap_fallback,
     };
     ESP_ERROR_CHECK(pm_wifi_start(&wifi));
+    pm_wifi_mdns_start(s_cfg.hostname);
     pm_status_led_set_mode(s_cfg.sta_ssid[0] ? PM_STATUS_WIFI_CONNECTING : PM_STATUS_WIFI_AP);
 
     pm_web_ui_hooks_t ui = {
@@ -495,5 +507,7 @@ void app_main(void)
     sync_dmx_receivers();
 
     xTaskCreate(render_loop, "render", 12288, NULL, 6, NULL);
-    ESP_LOGI(TAG, "PixelMap ready — open http://%s/", pm_wifi_ip_str());
+    ESP_LOGI(TAG, "PixelMap ready — http://%s/ or http://%s.local/",
+             pm_wifi_ip_str(),
+             s_cfg.hostname[0] ? s_cfg.hostname : "pixelmap");
 }

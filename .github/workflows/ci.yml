@@ -35,7 +35,7 @@ jobs:
       - name: Verify components exist
         run: |
           set -euo pipefail
-          for c in led_driver color mapping map_store effects effect_lua lua pov wifi_mgr web_ui artnet sacn config_store status_led; do
+          for c in led_driver color mapping map_store effects effect_lua lua pov wifi_mgr web_ui artnet sacn config_store status_led ota_update presets; do
             test -f "components/$c/CMakeLists.txt" || { echo "missing component: $c"; exit 1; }
           done
 
@@ -116,7 +116,7 @@ jobs:
             --flash_mode dio --flash_freq ${{ matrix.flash_freq }} --flash_size 4MB
             ${{ matrix.bootloader_offset }} build/bootloader/bootloader.bin
             0x8000 build/partition_table/partition-table.bin
-            0x10000 build/pixelmap.bin
+            0x20000 build/pixelmap.bin
             && cp build/pixelmap.bin build/pixelmap-${{ matrix.target }}.bin
             && cp build/bootloader/bootloader.bin build/bootloader-${{ matrix.target }}.bin
             && cp build/partition_table/partition-table.bin build/partition-table-${{ matrix.target }}.bin

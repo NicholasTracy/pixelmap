@@ -102,3 +102,10 @@ esp_err_t pm_map_store_load(pm_pixel_map_t *map)
     free(buf);
     return err;
 }
+
+esp_err_t pm_map_store_erase(void)
+{
+    const esp_partition_t *p = storage_part();
+    if (!p) return ESP_ERR_NOT_FOUND;
+    return esp_partition_erase_range(p, 0, p->size);
+}

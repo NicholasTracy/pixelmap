@@ -122,13 +122,13 @@ Only needed if you are not using the merged image.
 |------|---------|
 | `bootloader-esp32.bin` | `0x1000` |
 | `partition-table-esp32.bin` | `0x8000` |
-| `pixelmap-esp32.bin` | `0x10000` |
+| `pixelmap-esp32.bin` | `0x20000` (OTA slot `ota_0`) |
 
 ```bash
 esptool.py --chip esp32 -p COMx write_flash \
   0x1000 bootloader-esp32.bin \
   0x8000 partition-table-esp32.bin \
-  0x10000 pixelmap-esp32.bin
+  0x20000 pixelmap-esp32.bin
 ```
 
 Use the matching `esp32s3` filenames for S3 boards. On some S3 modules the bootloader offset is `0x0` instead of `0x1000` — prefer the merged image when unsure.
@@ -267,7 +267,7 @@ PixelMap ships with pin defaults that match many WLED ESP32 layouts:
 |----------|------------|-------|
 | LED data (main) | 16 | Primary data line on many WLED boards |
 | Status LED | 2 | Onboard LED on most ESP32 DevKit-style boards |
-| LED clock | 14 | Reserved in config/UI for future APA102 / SK9822 SPI |
+| LED clock | 14 | SPI clock for APA102 / SK9822 |
 
 You can change the data pin in the web UI if your board uses a different layout.
 
@@ -297,7 +297,7 @@ If you assign GPIO 2 as LED data instead, the status LED is disabled automatical
 - SK6812 RGBW
 - TM1814
 
-APA102 / SK9822 (SPI / clocked) are planned; they are hidden in the UI until the SPI driver lands. Color handling includes RGB, RGBW, HSV, gamma, and color correction.
+APA102 / SK9822 use SPI (data + clock GPIO; one strip on SPI2). Color handling includes RGB, RGBW, HSV, gamma, and color correction. Web OTA, mDNS (`hostname.local`), effect presets, optional UI PIN, and factory reset are available in the Network / Control tabs.
 
 ---
 

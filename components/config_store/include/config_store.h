@@ -105,6 +105,8 @@ typedef struct {
     uint16_t universe_count;
     bool artnet_enable;
     bool sacn_enable;
+    /** Minimum E1.31 priority to accept (0–200). */
+    uint8_t sacn_min_priority;
 
     uint16_t map_width;
     uint16_t map_height;
@@ -124,9 +126,19 @@ typedef struct {
     float pov_linear_speed_mps; /* wand sweep speed */
     float pov_radius_m;
     float pov_path_length_m;
+
+    /** Optional UI PIN (empty = open). Compared to X-PixelMap-Pin on mutating APIs. */
+    char ui_pin[8];
+    /** Estimated mA per LED at full white (UI power guidance). */
+    uint16_t ma_per_led;
 } pm_app_config_t;
 
+void pm_config_lock(void);
+void pm_config_unlock(void);
+
 void pm_config_set_defaults(pm_app_config_t *cfg);
+/** Erase PixelMap NVS namespaces (config, lua, presets). Does not reboot. */
+esp_err_t pm_config_factory_reset_nvs(void);
 /** WLED-friendly default data GPIO for strip index (0-based). */
 int pm_config_default_strip_gpio(uint8_t strip_index);
 /** Clamp strip_count / lengths / GPIOs; pixel_count = sum(strip_len); gpio_data = strip_gpio[0]. */

@@ -143,11 +143,30 @@ body{
         <div class="row g-3">
           <div class="col-md-6"><label class="form-label" for="ssid">WiFi SSID</label><input class="form-control" id="ssid"/></div>
           <div class="col-md-6"><label class="form-label" for="pass">WiFi Password</label><input class="form-control" id="pass" type="password" placeholder="Leave blank to keep current" autocomplete="new-password"/></div>
-          <div class="col-md-6"><label class="form-label" for="host">Hostname</label><input class="form-control" id="host"/></div>
+          <div class="col-md-6"><label class="form-label" for="host">Hostname</label><input class="form-control" id="host"/>
+            <p class="pm-help mb-0 mt-1">Also advertised as <span id="mdnsHint">hostname</span>.local via mDNS.</p>
+          </div>
+          <div class="col-md-6"><label class="form-label" for="uipin">UI PIN (optional)</label>
+            <input class="form-control" id="uipin" type="password" maxlength="7" placeholder="Leave blank for open UI" autocomplete="new-password"/>
+            <p class="pm-help mb-0 mt-1" id="pinHint" hidden>A PIN is set — enter it here (or in session) to change settings.</p>
+          </div>
         </div>
         <p class="pm-help mt-2 mb-0" id="passHint" hidden>A Wi‑Fi password is stored on the device (not shown).</p>
         <button class="btn btn-pm-primary mt-3" type="button" id="saveNetwork">Save network settings</button>
         <div class="pm-status" id="statusNetwork"></div>
+      </div>
+      <div class="pm-panel mt-3">
+        <h2 class="pm-section-title">Firmware update (OTA)</h2>
+        <p class="pm-help">Upload a <code>pixelmap.bin</code> (app image). Device reboots when done. Running partition: <strong id="otaPart">—</strong></p>
+        <input class="form-control" type="file" id="otaFile" accept=".bin"/>
+        <button class="btn btn-pm-primary mt-3" type="button" id="otaUpload">Upload &amp; reboot</button>
+        <div class="pm-status" id="statusOta"></div>
+      </div>
+      <div class="pm-panel mt-3">
+        <h2 class="pm-section-title">Factory reset</h2>
+        <p class="pm-help">Erases config, presets, Lua script, and saved map, then reboots.</p>
+        <button class="btn btn-outline-danger" type="button" id="factoryReset">Factory reset</button>
+        <div class="pm-status" id="statusFactory"></div>
       </div>
     </div>
 
@@ -163,8 +182,9 @@ body{
             <select class="form-select" id="chip">
               <option>WS2812B</option><option>WS2812</option><option>WS2811</option>
               <option>WS2813</option><option>SK6812_RGBW</option><option>TM1814</option>
+              <option>APA102</option><option>SK9822</option>
             </select>
-            <p class="pm-help mb-0 mt-1">APA102/SK9822 SPI support is planned; those chipsets are hidden until ready.</p>
+            <p class="pm-help mb-0 mt-1">APA102/SK9822 use SPI (data + clock). One strip only on SPI2.</p>
           </div>
           <div class="col-md-6"><label class="form-label" for="order">Color order</label>
             <select class="form-select" id="order">
@@ -173,10 +193,14 @@ body{
               <option>GRBW</option><option>RGBW</option><option>WRGB</option>
             </select>
           </div>
-          <div class="col-md-6"><label class="form-label" for="clk">Clock GPIO (−1 unused)</label>
-            <input class="form-control" id="clk" type="number" value="-1"/>
-            <p class="pm-help mb-0 mt-1">Reserved for future clocked chipsets (APA102).</p>
+          <div class="col-md-6"><label class="form-label" for="clk">Clock GPIO</label>
+            <input class="form-control" id="clk" type="number" value="14"/>
+            <p class="pm-help mb-0 mt-1">Required for APA102/SK9822 (SPI SCLK).</p>
           </div>
+          <div class="col-md-6"><label class="form-label" for="maled">mA per LED (est.)</label>
+            <input class="form-control" id="maled" type="number" min="1" max="1000" value="60"/>
+          </div>
+          <div class="col-12"><p class="pm-help mb-0" id="powerEst">Estimated draw: —</p></div>
           <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">
             <input class="form-check-input" type="checkbox" id="aw"/><label class="form-check-label" for="aw">Auto white (RGBW)</label>
           </div></div>
@@ -355,8 +379,18 @@ return hsv((ph + t * 40 + d * 80 * p2) % 256, ps, wave * pv * intensity)</textar
               <option value="0">Pixel RGB</option>
             </select>
           </div>
+          <div class="col-md-4">
+            <label class="form-label" for="sminp">sACN min priority</label>
+            <input class="form-control" id="sminp" type="number" min="0" max="200" value="0"/>
+          </div>
         </div>
-        <p class="pm-help mt-2 mb-0">Only one protocol can be on. Enabling Art-Net/sACN applies immediately (no reboot).</p>
+        <p class="pm-help mt-2 mb-0">Only one protocol can be on. Art-Net answers ArtPoll; sACN respects priority + min. Applies immediately.</p>
+      </div>
+      <div class="pm-panel mt-3">
+        <h2 class="pm-section-title">Effect presets</h2>
+        <p class="pm-help">Save/load effect + params (4 slots). Map is not included.</p>
+        <div id="presetSlots" class="d-flex flex-column gap-2"></div>
+        <div class="pm-status" id="statusPresets"></div>
       </div>
       <div class="pm-panel mt-3">
         <h2 class="pm-section-title">Channel control</h2>
@@ -908,7 +942,7 @@ function scheduleFxPush(){
   fxPushTimer = setTimeout(() => {
     fetch('/api/config', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders(),
       body: JSON.stringify(collectConfig()),
     }).catch(() => {});
   }, 140);
@@ -1284,6 +1318,30 @@ function applyFxConfig(c){
   syncCtlChannelRows();
 }
 
+function apiHeaders(extra){
+  const h = Object.assign({'Content-Type':'application/json'}, extra || {});
+  let pin = '';
+  try { pin = sessionStorage.getItem('pm_pin') || ''; } catch (_) {}
+  const typed = (document.getElementById('uipin') && uipin.value) || '';
+  if (typed) {
+    pin = typed;
+    try { sessionStorage.setItem('pm_pin', typed); } catch (_) {}
+  }
+  if (pin) h['X-PixelMap-Pin'] = pin;
+  return h;
+}
+
+function updatePowerEst(){
+  const el = document.getElementById('powerEst');
+  if (!el) return;
+  const n = +count.value | 0;
+  const bri = +bri.value | 0;
+  const ma = Math.max(1, +(document.getElementById('maled')?.value || 60) | 0);
+  const est = Math.round(n * ma * (bri / 255));
+  const w = (est * 5 / 1000).toFixed(1);
+  el.textContent = 'Estimated draw @ full white × brightness: ~' + est + ' mA (~' + w + ' W @ 5V). Size PSU with headroom.';
+}
+
 function collectConfig(){
   const slens = stripLengths();
   const sgpios = stripGpios();
@@ -1299,6 +1357,8 @@ function collectConfig(){
     chip:chip.value, order:order.value, fx:+fx.value, ...fxc,
     aun:+universe.value | 0, sun:+universe.value | 0, ucnt:+ucnt.value | 0,
     aen:!!aen.checked, sen:!!sen.checked && !aen.checked,
+    sminp:+(document.getElementById('sminp')?.value || 0) | 0,
+    maled:+(document.getElementById('maled')?.value || 60) | 0,
     mw:+mw.value, mh:+mh.value, md:+md.value, mdim:+mdim.value,
     mlay:+mlay.value, mfill:+mfill.value,
     mopentb: (+mfill.value|0) === 0 && !!mopentb.checked,
@@ -1307,15 +1367,18 @@ function collectConfig(){
     povrpm:+povrpm.value, povspd:+povspd.value, povrad:+povrad.value, povpath:+povpath.value
   };
   if (pass.value) body.pass = pass.value;
+  if (document.getElementById('uipin') && uipin.value !== '') body.uipin = uipin.value;
   return body;
 }
 
 async function saveConfig(statusEl, note){
   const body = collectConfig();
-  const r = await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  setStatus(statusEl, r.ok, r.ok ? (note || 'Saved.') : 'Save failed');
+  const r = await fetch('/api/config',{method:'POST',headers:apiHeaders(),body:JSON.stringify(body)});
+  const msg = r.status === 403 ? 'PIN required or incorrect' : (r.ok ? (note || 'Saved.') : 'Save failed');
+  setStatus(statusEl, r.ok, msg);
   if (r.ok && pass.value) pass.value = '';
   updateGates();
+  updatePowerEst();
 }
 
 /** Shapes available per dimension — Custom is in both. */
@@ -1885,12 +1948,20 @@ async function loadCfg(){
   ssid.value=c.ssid||''; pass.value=''; host.value=c.host||'pixelmap';
   const passHint = document.getElementById('passHint');
   if (passHint) passHint.hidden = !c.passSet;
+  const pinHint = document.getElementById('pinHint');
+  if (pinHint) pinHint.hidden = !c.pinSet;
+  if (document.getElementById('uipin')) uipin.value = '';
+  const mdnsHint = document.getElementById('mdnsHint');
+  if (mdnsHint) mdnsHint.textContent = c.host || 'pixelmap';
+  if (document.getElementById('otaPart')) otaPart.textContent = c.otaPart || '—';
+  if (document.getElementById('maled')) maled.value = c.maled != null ? c.maled : 60;
+  if (document.getElementById('sminp')) sminp.value = c.sminp != null ? c.sminp : 0;
   bri.value=c.bri; briVal.textContent='('+c.bri+')';
   gamma.value=c.gamma; sled.value=c.sled??2; sledh.checked=c.sledh!==false;
-  clk.value = c.clk != null ? c.clk : -1;
+  clk.value = c.clk != null ? c.clk : 14;
   aw.checked = c.aw !== false;
   let chipName = c.chip || 'WS2812B';
-  if (chipName === 'APA102' || chipName === 'SK9822' || chipName === 'CUSTOM') chipName = 'WS2812B';
+  if (chipName === 'CUSTOM') chipName = 'WS2812B';
   chip.value = chipName;
   order.value = c.order || 'GRB';
   fx.value=String(c.fx??1);
@@ -1922,7 +1993,63 @@ async function loadCfg(){
   gpio.value = String(sgpios[0]);
   rebuildStripLenFields(slens, sgpios);
   updateGates();
+  updatePowerEst();
+  loadPresets();
   startPovAnim();
+}
+
+async function loadPresets(){
+  const box = document.getElementById('presetSlots');
+  if (!box) return;
+  try {
+    const r = await fetch('/api/presets');
+    const j = await r.json();
+    const slots = j.slots || [];
+    box.innerHTML = '';
+    slots.forEach((s) => {
+      const row = document.createElement('div');
+      row.className = 'd-flex flex-wrap align-items-center gap-2';
+      const label = document.createElement('span');
+      label.className = 'pm-help mb-0';
+      label.style.minWidth = '7rem';
+      label.textContent = s.used ? (s.name || ('Slot ' + (s.slot + 1))) : ('Slot ' + (s.slot + 1) + ' (empty)');
+      const nameIn = document.createElement('input');
+      nameIn.className = 'form-control form-control-sm';
+      nameIn.style.maxWidth = '10rem';
+      nameIn.placeholder = 'Name';
+      nameIn.value = s.used ? (s.name || '') : '';
+      const btnSave = document.createElement('button');
+      btnSave.type = 'button'; btnSave.className = 'btn btn-sm btn-pm-primary'; btnSave.textContent = 'Save';
+      btnSave.onclick = async () => {
+        const rr = await fetch('/api/presets', {method:'POST', headers:apiHeaders(),
+          body: JSON.stringify({action:'save', slot:s.slot, name:nameIn.value})});
+        setStatus(statusPresets, rr.ok, rr.ok ? 'Preset saved' : (rr.status===403?'PIN required':'Save failed'));
+        if (rr.ok) loadPresets();
+      };
+      const btnApply = document.createElement('button');
+      btnApply.type = 'button'; btnApply.className = 'btn btn-sm btn-outline-secondary'; btnApply.textContent = 'Load';
+      btnApply.disabled = !s.used;
+      btnApply.onclick = async () => {
+        const rr = await fetch('/api/presets', {method:'POST', headers:apiHeaders(),
+          body: JSON.stringify({action:'apply', slot:s.slot})});
+        setStatus(statusPresets, rr.ok, rr.ok ? 'Preset loaded' : (rr.status===403?'PIN required':'Load failed'));
+        if (rr.ok) await loadCfg();
+      };
+      const btnClear = document.createElement('button');
+      btnClear.type = 'button'; btnClear.className = 'btn btn-sm btn-outline-danger'; btnClear.textContent = 'Clear';
+      btnClear.disabled = !s.used;
+      btnClear.onclick = async () => {
+        const rr = await fetch('/api/presets', {method:'POST', headers:apiHeaders(),
+          body: JSON.stringify({action:'clear', slot:s.slot})});
+        setStatus(statusPresets, rr.ok, rr.ok ? 'Cleared' : 'Clear failed');
+        if (rr.ok) loadPresets();
+      };
+      row.append(label, nameIn, btnSave, btnApply, btnClear);
+      box.appendChild(row);
+    });
+  } catch (_) {
+    box.textContent = 'Presets unavailable';
+  }
 }
 
 function mapSettingsSig(){
@@ -4108,7 +4235,7 @@ async function applyMapFormula(){
     assignDefaultStripGroups();
     updateGates();
     drawMap();
-    const r = await fetch('/api/map',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(map)});
+    const r = await fetch('/api/map',{method:'POST',headers:apiHeaders(),body:JSON.stringify(map)});
     await saveConfig(status, r.ok
       ? ('Formula map · ' + map.length + ' LEDs (layout=Custom). Saved.')
       : 'Formula built locally but map save failed');
@@ -4153,7 +4280,7 @@ document.getElementById('fxLuaSaveDevice').onclick = async () => {
   try {
     const r = await fetch('/api/fx/lua', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiHeaders(),
       body: JSON.stringify({ script: fxLua.value }),
     });
     const j = await r.json().catch(() => ({}));
@@ -4202,10 +4329,38 @@ saveStrip.onclick=async()=>{
   await saveConfig(statusStrip,'Strip settings saved.');
   syncStripTotal();
   syncMapBudget();
+  updatePowerEst();
 };
 saveEffects.onclick=()=>saveConfig(statusEffects,'Effect settings saved.');
 savePov.onclick=()=>saveConfig(statusPov,'POV settings saved.');
 saveControl.onclick=()=>saveConfig(statusControl,'Control settings saved.');
+
+bri.addEventListener('input', updatePowerEst);
+document.getElementById('maled')?.addEventListener('input', updatePowerEst);
+document.getElementById('scnt')?.addEventListener('change', updatePowerEst);
+
+document.getElementById('otaUpload')?.addEventListener('click', async () => {
+  const f = document.getElementById('otaFile')?.files?.[0];
+  if (!f) { setStatus(statusOta, false, 'Choose a .bin file first'); return; }
+  setStatus(statusOta, true, 'Uploading ' + f.name + '…');
+  try {
+    const buf = await f.arrayBuffer();
+    const headers = apiHeaders();
+    delete headers['Content-Type'];
+    headers['Content-Type'] = 'application/octet-stream';
+    const r = await fetch('/api/ota', {method:'POST', headers, body: buf});
+    if (r.ok) setStatus(statusOta, true, 'OTA OK — rebooting…');
+    else setStatus(statusOta, false, r.status === 403 ? 'PIN required' : 'OTA failed');
+  } catch (e) {
+    setStatus(statusOta, false, 'Upload failed');
+  }
+});
+
+document.getElementById('factoryReset')?.addEventListener('click', async () => {
+  if (!confirm('Factory reset erases config, map, presets, and Lua. Continue?')) return;
+  const r = await fetch('/api/factory_reset', {method:'POST', headers:apiHeaders(), body:'{}'});
+  setStatus(statusFactory, r.ok, r.ok ? 'Reset OK — rebooting…' : (r.status===403?'PIN required':'Reset failed'));
+});
 
 buildGrid.onclick=async()=>{
   if (wireMode) setWireMode(false);
@@ -4220,7 +4375,7 @@ buildGrid.onclick=async()=>{
   if (want > strip) {
     setStatus(mapStatus, false, 'Shape needs ' + want + ' LEDs; strips only have ' + strip + '. Build will subsample to keep full dimensions.');
   }
-  const r=await fetch('/api/map/grid',{method:'POST',headers:{'Content-Type':'application/json'},
+  const r=await fetch('/api/map/grid',{method:'POST',headers:apiHeaders(),
     body:JSON.stringify({
       w:+mw.value, h:+mh.value, d:+md.value, dim:+mdim.value,
       lay:mapLayout(), spc:+mspc.value, fill:+mfill.value, opentb:!!mopentb.checked
@@ -4245,8 +4400,8 @@ saveMap.onclick=async()=>{
   if (wireMode) applyWireAssignment(+routeStrip.value | 0);
   // Replace unassigned markers so firmware always has valid strip indices
   map.forEach((p, mi) => { if ((p.i | 0) >= 65535) p.i = mi; });
-  const r=await fetch('/api/map',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(map)});
-  setStatus(mapStatus,r.ok,r.ok?'Map saved (including wire order)':'Map save failed');
+  const r=await fetch('/api/map',{method:'POST',headers:apiHeaders(),body:JSON.stringify(map)});
+  setStatus(mapStatus,r.ok,r.ok?'Map saved (including wire order)':(r.status===403?'PIN required':'Map save failed'));
 };
 
 rebuildStripLenFields([60], [DEFAULT_STRIP_GPIOS[0]]);

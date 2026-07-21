@@ -37,7 +37,7 @@ When POV is enabled, `effects` asks `pov` for each pixel’s **instantaneous wor
 
 ## Bare-metal signaling
 
-WS281x / SK6812 / TM1814 use the ESP32 **RMT** TX peripheral with nanosecond timing tables (`led_chipsets.c`). Bit patterns are DMA-friendly via `rmt_bytes_encoder`. APA102 / SK9822 SPI is **not implemented yet** (hidden in the UI).
+WS281x / SK6812 / TM1814 use the ESP32 **RMT** TX peripheral with nanosecond timing tables (`led_chipsets.c`). Bit patterns are DMA-friendly via `rmt_bytes_encoder`. APA102 / SK9822 use **SPI2** (MOSI = data, SCLK = clock); multi-strip SPI is not supported yet.
 
 ## Status LED
 
@@ -56,10 +56,13 @@ Embedded single-page app (`components/web_ui/index.html`) served by `esp_http_se
 | `GET /` | Editor UI |
 | `GET /vendor/bootstrap.min.css` | Bootstrap CSS (embedded) |
 | `GET /vendor/bootstrap.bundle.min.js` | Bootstrap JS (embedded) |
-| `GET/POST /api/config` | Device + strip + protocol settings (`pass` never returned on GET) |
-| `GET/POST /api/map` | Spatial map JSON (persisted to SPIFFS) |
+| `GET/POST /api/config` | Device + strip + protocol settings (`pass` never returned on GET; optional `X-PixelMap-Pin`) |
+| `GET/POST /api/map` | Spatial map JSON (persisted via `map_store`) |
 | `POST /api/map/grid` | Generate normalized lattice / shape |
 | `GET/POST /api/fx/lua` | Custom Lua effect script |
+| `GET/POST /api/ota` | Firmware OTA (raw `.bin` body on POST) |
+| `GET/POST /api/presets` | Effect preset slots |
+| `POST /api/factory_reset` | Erase NVS + map storage, reboot |
 
 ## Host virtbench (CI)
 
