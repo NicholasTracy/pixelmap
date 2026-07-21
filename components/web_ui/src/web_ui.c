@@ -14,6 +14,7 @@
 #include "ota_update.h"
 #include "presets.h"
 #include "map_store.h"
+#include "audio.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -129,6 +130,13 @@ static esp_err_t h_get_config(httpd_req_t *req)
     cJSON_AddStringToObject(o, "otaPart", pm_ota_running_label());
     cJSON_AddNumberToObject(o, "maled", c->ma_per_led);
     cJSON_AddNumberToObject(o, "sminp", c->sacn_min_priority);
+    cJSON_AddBoolToObject(o, "auden", c->audio_enable);
+    cJSON_AddNumberToObject(o, "audws", c->audio_gpio_ws);
+    cJSON_AddNumberToObject(o, "audck", c->audio_gpio_sck);
+    cJSON_AddNumberToObject(o, "audsd", c->audio_gpio_sd);
+    cJSON_AddNumberToObject(o, "audgn", c->audio_gain);
+    cJSON_AddNumberToObject(o, "audsq", c->audio_squelch);
+    cJSON_AddBoolToObject(o, "audmod", c->audio_modulate);
     cJSON_AddNumberToObject(o, "gpio", c->gpio_data);
     cJSON_AddNumberToObject(o, "clk", c->gpio_clock);
     cJSON_AddNumberToObject(o, "sled", c->gpio_status_led);
@@ -414,6 +422,23 @@ static esp_err_t h_post_config(httpd_req_t *req)
         strncpy(c->ui_pin, v->valuestring, sizeof(c->ui_pin) - 1);
         c->ui_pin[sizeof(c->ui_pin) - 1] = '\0';
     }
+    if ((v = cJSON_GetObjectItem(j, "auden"))) c->audio_enable = cJSON_IsTrue(v);
+    if ((v = cJSON_GetObjectItem(j, "audws")) && cJSON_IsNumber(v)) c->audio_gpio_ws = (int)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(j, "audck")) && cJSON_IsNumber(v)) c->audio_gpio_sck = (int)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(j, "audsd")) && cJSON_IsNumber(v)) c->audio_gpio_sd = (int)v->valuedouble;
+    if ((v = cJSON_GetObjectItem(j, "audgn")) && cJSON_IsNumber(v)) {
+        int g = (int)v->valuedouble;
+        if (g < 1) g = 1;
+        if (g > 255) g = 255;
+        c->audio_gain = (uint8_t)g;
+    }
+    if ((v = cJSON_GetObjectItem(j, "audsq")) && cJSON_IsNumber(v)) {
+        int q = (int)v->valuedouble;
+        if (q < 0) q = 0;
+        if (q > 255) q = 255;
+        c->audio_squelch = (uint8_t)q;
+    }
+    if ((v = cJSON_GetObjectItem(j, "audmod"))) c->audio_modulate = cJSON_IsTrue(v);
     /* Only one protocol at a time */
     if (c->artnet_enable && c->sacn_enable) c->sacn_enable = false;
     if ((v = cJSON_GetObjectItem(j, "mw")) && cJSON_IsNumber(v)) c->map_width = (uint16_t)v->valuedouble;
@@ -754,12 +779,32 @@ static esp_err_t h_post_factory_reset(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t h_get_audio(httpd_req_t *req)
+{
+    pm_audio_levels_t lv;
+    pm_audio_get_levels(&lv);
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "on", pm_audio_running());
+    cJSON_AddBoolToObject(o, "active", lv.active);
+    cJSON_AddNumberToObject(o, "vol", lv.volume);
+    cJSON_AddNumberToObject(o, "bass", lv.bass);
+    cJSON_AddNumberToObject(o, "mid", lv.mid);
+    cJSON_AddNumberToObject(o, "tre", lv.treble);
+    cJSON_AddBoolToObject(o, "beat", lv.beat);
+    cJSON *bins = cJSON_CreateArray();
+    for (int i = 0; i < PM_AUDIO_BINS; ++i) {
+        cJSON_AddItemToArray(bins, cJSON_CreateNumber(lv.bins[i]));
+    }
+    cJSON_AddItemToObject(o, "bins", bins);
+    return send_json(req, o);
+}
+
 esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
 {
     if (!hooks || !hooks->cfg || !hooks->map) return ESP_ERR_INVALID_ARG;
     s_hooks = *hooks;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 24;
+    config.max_uri_handlers = 28;
     config.stack_size = 8192;
     ESP_RETURN_ON_ERROR(httpd_start(&s_server, &config), TAG, "httpd");
 
@@ -779,6 +824,7 @@ esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
         {.uri = "/api/presets", .method = HTTP_GET, .handler = h_get_presets},
         {.uri = "/api/presets", .method = HTTP_POST, .handler = h_post_presets},
         {.uri = "/api/factory_reset", .method = HTTP_POST, .handler = h_post_factory_reset},
+        {.uri = "/api/audio", .method = HTTP_GET, .handler = h_get_audio},
     };
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); ++i) {
         httpd_register_uri_handler(s_server, &routes[i]);

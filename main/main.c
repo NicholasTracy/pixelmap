@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "nvs_flash.h"
+#include <math.h>
 
 #include "config_store.h"
 #include "led_strip.h"
@@ -17,6 +18,7 @@
 #include "sacn.h"
 #include "status_led.h"
 #include "presets.h"
+#include "audio.h"
 
 static const char *TAG = "pixelmap";
 
@@ -399,6 +401,16 @@ static void render_loop(void *arg)
             if (!cfg.artnet_enable && !cfg.sacn_enable) {
                 pm_config_apply_fx_mods(&fxcfg, now_ms);
             }
+            pm_audio_levels_t levels;
+            pm_audio_get_levels(&levels);
+            if (cfg.audio_modulate && levels.active) {
+                float drive = 0.25f + 0.75f * levels.volume;
+                if (levels.beat) drive = fminf(1.0f, drive + 0.2f);
+                float iv = fxcfg.effect_intensity / 255.0f * drive;
+                if (iv < 0.0f) iv = 0.0f;
+                if (iv > 1.0f) iv = 1.0f;
+                fxcfg.effect_intensity = (uint8_t)(iv * 255.0f + 0.5f);
+            }
             pm_effect_params_t params;
             pm_config_fill_effect_params(&fxcfg, &params);
             pm_effect_context_t ctx = {
@@ -416,6 +428,7 @@ static void render_loop(void *arg)
                     .path_length_m = cfg.pov_path_length_m,
                 },
                 .strip_len = s_total_len,
+                .audio = levels.active ? &levels : NULL,
             };
             pm_effect_render(&ctx, set_px, NULL);
         }
@@ -505,6 +518,7 @@ void app_main(void)
     ESP_ERROR_CHECK(pm_web_ui_start(&ui));
 
     sync_dmx_receivers();
+    sync_audio();
 
     xTaskCreate(render_loop, "render", 12288, NULL, 6, NULL);
     ESP_LOGI(TAG, "PixelMap ready — http://%s/ or http://%s.local/",

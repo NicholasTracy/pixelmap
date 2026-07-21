@@ -39,6 +39,10 @@ When POV is enabled, `effects` asks `pov` for each pixel’s **instantaneous wor
 
 WS281x / SK6812 / TM1814 use the ESP32 **RMT** TX peripheral with nanosecond timing tables (`led_chipsets.c`). Bit patterns are DMA-friendly via `rmt_bytes_encoder`. APA102 / SK9822 use **SPI2** (MOSI = data, SCLK = clock); multi-strip SPI is not supported yet.
 
+## Audio reactive
+
+Optional I2S MEMS mic (`components/audio`, INMP441-style: WS / BCLK / DOUT). A lightweight 256-point FFT produces volume, bass/mid/treble, 16 spectrum bins, and a beat pulse. Levels feed `pm_effect_context_t.audio` for Audio Pulse / Ripple / Spectrum effects, and can optionally scale any effect’s intensity. Bluetooth is not implemented.
+
 ## Status LED
 
 `status_led` drives the WLED-style onboard LED (default **GPIO 2**) with **LEDC PWM** breathing/ramps so modes are visually distinct: boot fade-in, fast Wi‑Fi breath, slow AP breath, soft heartbeat, DMX sawtooth, fault peaks, soft SOS. Automatically disabled if the pin conflicts with LED data/clock.
@@ -63,6 +67,7 @@ Embedded single-page app (`components/web_ui/index.html`) served by `esp_http_se
 | `GET/POST /api/ota` | Firmware OTA (raw `.bin` body on POST) |
 | `GET/POST /api/presets` | Effect preset slots |
 | `POST /api/factory_reset` | Erase NVS + map storage, reboot |
+| `GET /api/audio` | Live mic levels (volume / bands / spectrum / beat) |
 
 ## Host virtbench (CI)
 

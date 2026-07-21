@@ -92,6 +92,9 @@ const char *pm_effect_name(pm_effect_id_t id)
     case PM_EFFECT_POLAR_GRID: return "Polar Grid";
     case PM_EFFECT_WAVE_WALLS: return "Wave Walls";
     case PM_EFFECT_CUSTOM_LUA: return "Custom Lua";
+    case PM_EFFECT_AUDIO_PULSE: return "Audio Pulse";
+    case PM_EFFECT_AUDIO_RIPPLE: return "Audio Ripple";
+    case PM_EFFECT_AUDIO_SPECTRUM: return "Audio Spectrum";
     default: return "Unknown";
     }
 }
@@ -144,6 +147,11 @@ uint32_t pm_effect_param_mask(pm_effect_id_t id)
         return FXM_SPD | FXM_SCL | FXM_INT | FXM_PRI | FXM_SEC | FXM_GEO;
     case PM_EFFECT_CUSTOM_LUA:
         return (uint32_t)((1u << PM_FXPARAM_COUNT) - 1u);
+    case PM_EFFECT_AUDIO_PULSE:
+        return FXM_INT | FXM_PRI | FXM_SEC | FXM_P1 | FXM_GEO;
+    case PM_EFFECT_AUDIO_RIPPLE:
+    case PM_EFFECT_AUDIO_SPECTRUM:
+        return FXM_SCL | FXM_INT | FXM_PRI | FXM_SEC | FXM_P1 | FXM_GEO;
     default:
         return FXM_SPD | FXM_SCL | FXM_INT | FXM_PRI | FXM_GEO;
     }
@@ -535,6 +543,45 @@ pm_rgb_t pm_effect_eval(const pm_effect_context_t *ctx, uint16_t map_index)
         };
         for (int k = 0; k < PM_FX_P_COUNT; ++k) lin.p[k] = ctx->params.p[k];
         return pm_effect_lua_eval(&lin, map_index, n, pos.x, pos.y, pos.z, t);
+    }
+    case PM_EFFECT_AUDIO_PULSE: {
+        const pm_audio_levels_t *a = ctx->audio;
+        float v = (a && a->active) ? (0.55f * a->volume + 0.45f * a->bass) : 0.0f;
+        if (a && a->beat) v = clampf(v + 0.35f, 0.0f, 1.0f);
+        float mix = ctx->params.p[0]; /* 0..1: how hard beat flashes */
+        v = clampf(v * (0.4f + 0.6f * mix), 0.0f, 1.0f);
+        hsv = lerp_hsv(hsv, sec, a && a->beat ? 1.0f : v);
+        hsv.v = (uint8_t)(v * 255.0f * inten);
+        break;
+    }
+    case PM_EFFECT_AUDIO_RIPPLE: {
+        const pm_audio_levels_t *a = ctx->audio;
+        float energy = (a && a->active) ? (0.35f * a->volume + 0.65f * a->bass) : 0.0f;
+        if (a && a->beat) energy = clampf(energy + 0.4f, 0.0f, 1.0f);
+        float r = sqrtf(cx * cx + cy * cy + cz * cz);
+        float ring = fabsf(r * (2.0f + 6.0f * scale) - energy * 1.4f);
+        float band = ring < 0.12f ? 1.0f - ring / 0.12f : 0.0f;
+        float glow = energy * (0.15f + 0.25f * (1.0f - clampf(r, 0.0f, 1.0f)));
+        float mix = clampf(fmaxf(band, glow), 0.0f, 1.0f);
+        hsv = lerp_hsv(hsv, sec, band);
+        hsv.v = (uint8_t)(mix * 255.0f * inten);
+        break;
+    }
+    case PM_EFFECT_AUDIO_SPECTRUM: {
+        const pm_audio_levels_t *a = ctx->audio;
+        float u = clampf(cx * 0.5f + 0.5f, 0.0f, 0.999f);
+        int bi = (int)(u * (float)PM_AUDIO_BINS);
+        if (bi < 0) bi = 0;
+        if (bi >= PM_AUDIO_BINS) bi = PM_AUDIO_BINS - 1;
+        float level = (a && a->active) ? a->bins[bi] : 0.0f;
+        float height = cy * 0.5f + 0.5f;
+        float bar = level > height ? clampf((level - height) * 4.0f + 0.35f, 0.0f, 1.0f) : 0.0f;
+        float tip = fabsf(height - level) < 0.04f ? 1.0f : 0.0f;
+        float mix = clampf(fmaxf(bar * 0.85f, tip), 0.0f, 1.0f);
+        hsv.h = (uint8_t)((int)(ctx->params.primary.h + bi * (18 + (int)(scale * 20.0f))) & 255);
+        hsv = lerp_hsv(hsv, sec, tip);
+        hsv.v = (uint8_t)(mix * 255.0f * inten);
+        break;
     }
     default:
         break;

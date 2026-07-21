@@ -286,7 +286,7 @@ Phases are sequential enough to ship value; items within a phase can parallelize
 - [ ] Multi-region / segment effects on one map  
 - [ ] Sensor or closed-loop RPM (opt-in)  
 - [ ] MQTT / HA discovery  
-- [ ] Audio reactive  
+- [x] Audio reactive (I2S mic + FFT; no Bluetooth)  
 - [ ] Broader chipset pack (UTF-8 / RGBWW SK variants)  
 - [ ] On-device Lua preview via embedded fengari (if kept)  
 

@@ -132,6 +132,7 @@ body{
     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-strip" type="button">Strip</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-effects" data-bs-toggle="tab" data-bs-target="#pane-effects" type="button">Effects</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-pov" data-bs-toggle="tab" data-bs-target="#pane-pov" type="button">POV</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" id="tab-audio" data-bs-toggle="tab" data-bs-target="#pane-audio" type="button">Audio</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-control" data-bs-toggle="tab" data-bs-target="#pane-control" type="button">Control</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" id="tab-map" data-bs-toggle="tab" data-bs-target="#pane-map" type="button">Map</button></li>
   </ul>
@@ -262,6 +263,11 @@ body{
                 <option value="24">Wave Walls</option>
                 <option value="25">Custom Lua</option>
               </optgroup>
+              <optgroup label="Audio">
+                <option value="26">Audio Pulse</option>
+                <option value="27">Audio Ripple</option>
+                <option value="28">Audio Spectrum</option>
+              </optgroup>
             </select>
           </div>
         </div>
@@ -351,6 +357,53 @@ return hsv((ph + t * 40 + d * 80 * p2) % 256, ps, wave * pv * intensity)</textar
           <button class="btn btn-pm-primary mt-3" type="button" id="savePov">Save POV settings</button>
           <div class="pm-status" id="statusPov"></div>
         </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="pane-audio">
+      <div class="pm-panel">
+        <h2 class="pm-section-title">Microphone (I2S)</h2>
+        <p class="pm-help">INMP441-style MEMS mic over I2S. No Bluetooth — audio drives effects on-device. Tie mic L/R to GND for left channel.</p>
+        <div class="row g-3">
+          <div class="col-md-6 d-flex align-items-end">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="auden"/>
+              <label class="form-check-label" for="auden">Enable mic capture</label>
+            </div>
+          </div>
+          <div class="col-md-6 d-flex align-items-end">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="audmod"/>
+              <label class="form-check-label" for="audmod">Modulate any effect’s intensity from volume</label>
+            </div>
+          </div>
+          <div class="col-md-4"><label class="form-label" for="audws">WS / LRCLK GPIO</label>
+            <input class="form-control" id="audws" type="number" value="15"/>
+          </div>
+          <div class="col-md-4"><label class="form-label" for="audck">BCLK GPIO</label>
+            <input class="form-control" id="audck" type="number" value="14"/>
+          </div>
+          <div class="col-md-4"><label class="form-label" for="audsd">DOUT → DIN GPIO</label>
+            <input class="form-control" id="audsd" type="number" value="32"/>
+          </div>
+          <div class="col-md-6"><label class="form-label" for="audgn">Gain <span id="audgnVal"></span></label>
+            <input class="form-range" id="audgn" type="range" min="1" max="255" value="128"/>
+          </div>
+          <div class="col-md-6"><label class="form-label" for="audsq">Squelch <span id="audsqVal"></span></label>
+            <input class="form-range" id="audsq" type="range" min="0" max="255" value="20"/>
+          </div>
+        </div>
+        <p class="pm-help mt-2 mb-1">Live levels (enable mic, then pick Audio Pulse / Ripple / Spectrum under Effects).</p>
+        <div class="d-flex flex-column gap-1 mb-2" id="audioMeters">
+          <div class="d-flex align-items-center gap-2"><span class="pm-help mb-0" style="min-width:3.5rem">Vol</span><div class="progress flex-grow-1" style="height:.55rem"><div class="progress-bar" id="audBarVol" style="width:0%"></div></div></div>
+          <div class="d-flex align-items-center gap-2"><span class="pm-help mb-0" style="min-width:3.5rem">Bass</span><div class="progress flex-grow-1" style="height:.55rem"><div class="progress-bar" id="audBarBass" style="width:0%"></div></div></div>
+          <div class="d-flex align-items-center gap-2"><span class="pm-help mb-0" style="min-width:3.5rem">Mid</span><div class="progress flex-grow-1" style="height:.55rem"><div class="progress-bar" id="audBarMid" style="width:0%"></div></div></div>
+          <div class="d-flex align-items-center gap-2"><span class="pm-help mb-0" style="min-width:3.5rem">Treble</span><div class="progress flex-grow-1" style="height:.55rem"><div class="progress-bar" id="audBarTre" style="width:0%"></div></div></div>
+        </div>
+        <canvas id="audSpec" width="640" height="80" style="width:100%;max-width:40rem;background:rgba(0,0,0,.08)"></canvas>
+        <p class="pm-help mt-2 mb-0" id="audBeatHint">Beat: —</p>
+        <button class="btn btn-pm-primary mt-3" type="button" id="saveAudio">Save audio settings</button>
+        <div class="pm-status" id="statusAudio"></div>
       </div>
     </div>
 
@@ -1359,6 +1412,13 @@ function collectConfig(){
     aen:!!aen.checked, sen:!!sen.checked && !aen.checked,
     sminp:+(document.getElementById('sminp')?.value || 0) | 0,
     maled:+(document.getElementById('maled')?.value || 60) | 0,
+    auden:!!document.getElementById('auden')?.checked,
+    audws:+(document.getElementById('audws')?.value || 15) | 0,
+    audck:+(document.getElementById('audck')?.value || 14) | 0,
+    audsd:+(document.getElementById('audsd')?.value || 32) | 0,
+    audgn:+(document.getElementById('audgn')?.value || 128) | 0,
+    audsq:+(document.getElementById('audsq')?.value || 20) | 0,
+    audmod:!!document.getElementById('audmod')?.checked,
     mw:+mw.value, mh:+mh.value, md:+md.value, mdim:+mdim.value,
     mlay:+mlay.value, mfill:+mfill.value,
     mopentb: (+mfill.value|0) === 0 && !!mopentb.checked,
@@ -1956,6 +2016,13 @@ async function loadCfg(){
   if (document.getElementById('otaPart')) otaPart.textContent = c.otaPart || '—';
   if (document.getElementById('maled')) maled.value = c.maled != null ? c.maled : 60;
   if (document.getElementById('sminp')) sminp.value = c.sminp != null ? c.sminp : 0;
+  if (document.getElementById('auden')) auden.checked = !!c.auden;
+  if (document.getElementById('audmod')) audmod.checked = !!c.audmod;
+  if (document.getElementById('audws')) audws.value = c.audws != null ? c.audws : 15;
+  if (document.getElementById('audck')) audck.value = c.audck != null ? c.audck : 14;
+  if (document.getElementById('audsd')) audsd.value = c.audsd != null ? c.audsd : 32;
+  if (document.getElementById('audgn')) { audgn.value = c.audgn != null ? c.audgn : 128; audgnVal.textContent = '(' + audgn.value + ')'; }
+  if (document.getElementById('audsq')) { audsq.value = c.audsq != null ? c.audsq : 20; audsqVal.textContent = '(' + audsq.value + ')'; }
   bri.value=c.bri; briVal.textContent='('+c.bri+')';
   gamma.value=c.gamma; sled.value=c.sled??2; sledh.checked=c.sledh!==false;
   clk.value = c.clk != null ? c.clk : 14;
@@ -4333,7 +4400,44 @@ saveStrip.onclick=async()=>{
 };
 saveEffects.onclick=()=>saveConfig(statusEffects,'Effect settings saved.');
 savePov.onclick=()=>saveConfig(statusPov,'POV settings saved.');
+saveAudio.onclick=()=>saveConfig(statusAudio,'Audio settings saved. Mic starts/stops immediately.');
 saveControl.onclick=()=>saveConfig(statusControl,'Control settings saved.');
+
+document.getElementById('audgn')?.addEventListener('input', () => { audgnVal.textContent = '(' + audgn.value + ')'; });
+document.getElementById('audsq')?.addEventListener('input', () => { audsqVal.textContent = '(' + audsq.value + ')'; });
+
+async function pollAudioMeters(){
+  const pane = document.getElementById('pane-audio');
+  if (!pane || !pane.classList.contains('active') && !pane.classList.contains('show')) return;
+  try {
+    const r = await fetch('/api/audio');
+    if (!r.ok) return;
+    const j = await r.json();
+    const pct = (x) => Math.round(Math.max(0, Math.min(1, +x || 0)) * 100) + '%';
+    if (audBarVol) audBarVol.style.width = pct(j.vol);
+    if (audBarBass) audBarBass.style.width = pct(j.bass);
+    if (audBarMid) audBarMid.style.width = pct(j.mid);
+    if (audBarTre) audBarTre.style.width = pct(j.tre);
+    if (audBeatHint) audBeatHint.textContent = j.on
+      ? ('Beat: ' + (j.beat ? '●' : '○') + (j.active ? '' : ' (waiting for signal)'))
+      : 'Beat: — (mic off)';
+    const canvas = document.getElementById('audSpec');
+    if (canvas && Array.isArray(j.bins)) {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      const n = j.bins.length;
+      const bw = w / n;
+      for (let i = 0; i < n; i++) {
+        const v = Math.max(0, Math.min(1, +j.bins[i] || 0));
+        const bh = v * (h - 4);
+        ctx.fillStyle = j.beat ? '#c45c26' : '#3d6b8c';
+        ctx.fillRect(i * bw + 1, h - bh, bw - 2, bh);
+      }
+    }
+  } catch (_) {}
+}
+setInterval(pollAudioMeters, 120);
 
 bri.addEventListener('input', updatePowerEst);
 document.getElementById('maled')?.addEventListener('input', updatePowerEst);

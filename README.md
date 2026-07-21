@@ -299,6 +299,8 @@ If you assign GPIO 2 as LED data instead, the status LED is disabled automatical
 
 APA102 / SK9822 use SPI (data + clock GPIO; one strip on SPI2). Color handling includes RGB, RGBW, HSV, gamma, and color correction. Web OTA, mDNS (`hostname.local`), effect presets, optional UI PIN, and factory reset are available in the Network / Control tabs.
 
+**Audio reactive:** optional I2S MEMS mic (INMP441-style). Enable under the Audio tab (WS / BCLK / DOUT GPIOs, gain, squelch). Use effects **Audio Pulse**, **Audio Ripple**, **Audio Spectrum**, or turn on “modulate intensity” for any effect. Bluetooth is not included.
+
 ---
 
 ## Updating PixelMap later

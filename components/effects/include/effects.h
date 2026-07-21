@@ -41,8 +41,24 @@ typedef enum {
 
     PM_EFFECT_CUSTOM_LUA, /* user script via effect_lua runtime */
 
+    /* Audio-reactive (need live mic levels in context) */
+    PM_EFFECT_AUDIO_PULSE,
+    PM_EFFECT_AUDIO_RIPPLE,
+    PM_EFFECT_AUDIO_SPECTRUM,
+
     PM_EFFECT_COUNT
 } pm_effect_id_t;
+
+#define PM_AUDIO_BINS 16
+
+/** Live analysis snapshot from `audio` component (optional on context). */
+typedef struct {
+    float volume;
+    float bass, mid, treble;
+    float bins[PM_AUDIO_BINS];
+    bool beat;
+    bool active;
+} pm_audio_levels_t;
 
 #define PM_FX_P_COUNT 8
 
@@ -97,6 +113,8 @@ typedef struct {
     bool pov_enabled;
     pm_pov_params_t pov;
     uint16_t strip_len;   /* physical strip length for POV */
+    /** Optional mic levels; NULL or inactive → audio effects stay dark/quiet. */
+    const pm_audio_levels_t *audio;
 } pm_effect_context_t;
 
 const char *pm_effect_name(pm_effect_id_t id);

@@ -131,6 +131,16 @@ typedef struct {
     char ui_pin[8];
     /** Estimated mA per LED at full white (UI power guidance). */
     uint16_t ma_per_led;
+
+    /** I2S MEMS mic (INMP441-style) audio reactive. */
+    bool audio_enable;
+    int audio_gpio_ws;
+    int audio_gpio_sck;
+    int audio_gpio_sd;
+    uint8_t audio_gain;     /* 1..255 */
+    uint8_t audio_squelch;  /* 0..255 noise gate */
+    /** When true, mic volume scales effect intensity for any effect. */
+    bool audio_modulate;
 } pm_app_config_t;
 
 void pm_config_lock(void);

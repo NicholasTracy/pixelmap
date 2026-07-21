@@ -6,8 +6,12 @@
     "led_data_2": -1,
     "led_clock": 14,
     "button": 0,
-    "status_led": 2
+    "status_led": 2,
+    "audio_ws": 15,
+    "audio_sck": 14,
+    "audio_sd": 32
   },
+  "audio_notes": "INMP441 I2S defaults match the Audio tab. If using APA102, move BCLK off GPIO 14 (shared with LED clock).",
   "status_led_notes": "GPIO 2 is the ESP32 DevKit onboard LED used by many WLED boards. Disabled automatically if the same pin is chosen for LED data.",
   "defaults": {
     "chipset": "WS2812B",

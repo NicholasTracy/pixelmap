@@ -157,6 +157,13 @@ void pm_config_set_defaults(pm_app_config_t *cfg)
     cfg->sacn_min_priority = 0;
     cfg->ui_pin[0] = '\0';
     cfg->ma_per_led = 60;
+    cfg->audio_enable = false;
+    cfg->audio_gpio_ws = 15;
+    cfg->audio_gpio_sck = 14;
+    cfg->audio_gpio_sd = 32;
+    cfg->audio_gain = 128;
+    cfg->audio_squelch = 20;
+    cfg->audio_modulate = false;
     cfg->map_width = 10;
     cfg->map_height = 6;
     cfg->map_depth = 1;
@@ -464,6 +471,21 @@ esp_err_t pm_config_load(pm_app_config_t *cfg)
         if (v > 1000) v = 1000;
         cfg->ma_per_led = (uint16_t)v;
     }
+    if (nvs_get_i32(h, "auden", &v) == ESP_OK) cfg->audio_enable = v != 0;
+    if (nvs_get_i32(h, "audws", &v) == ESP_OK) cfg->audio_gpio_ws = v;
+    if (nvs_get_i32(h, "audck", &v) == ESP_OK) cfg->audio_gpio_sck = v;
+    if (nvs_get_i32(h, "audsd", &v) == ESP_OK) cfg->audio_gpio_sd = v;
+    if (nvs_get_i32(h, "audgn", &v) == ESP_OK) {
+        if (v < 1) v = 1;
+        if (v > 255) v = 255;
+        cfg->audio_gain = (uint8_t)v;
+    }
+    if (nvs_get_i32(h, "audsq", &v) == ESP_OK) {
+        if (v < 0) v = 0;
+        if (v > 255) v = 255;
+        cfg->audio_squelch = (uint8_t)v;
+    }
+    if (nvs_get_i32(h, "audmod", &v) == ESP_OK) cfg->audio_modulate = v != 0;
     if (nvs_get_i32(h, "mw", &v) == ESP_OK) cfg->map_width = (uint16_t)v;
     if (nvs_get_i32(h, "mh", &v) == ESP_OK) cfg->map_height = (uint16_t)v;
     if (nvs_get_i32(h, "md", &v) == ESP_OK) cfg->map_depth = (uint16_t)v;
@@ -548,6 +570,13 @@ esp_err_t pm_config_save(const pm_app_config_t *cfg)
     nvs_set_i32(h, "sminp", cfg->sacn_min_priority);
     nvs_set_str(h, "uipin", cfg->ui_pin);
     nvs_set_i32(h, "maled", cfg->ma_per_led);
+    nvs_set_i32(h, "auden", cfg->audio_enable ? 1 : 0);
+    nvs_set_i32(h, "audws", cfg->audio_gpio_ws);
+    nvs_set_i32(h, "audck", cfg->audio_gpio_sck);
+    nvs_set_i32(h, "audsd", cfg->audio_gpio_sd);
+    nvs_set_i32(h, "audgn", cfg->audio_gain);
+    nvs_set_i32(h, "audsq", cfg->audio_squelch);
+    nvs_set_i32(h, "audmod", cfg->audio_modulate ? 1 : 0);
     nvs_set_i32(h, "mw", cfg->map_width);
     nvs_set_i32(h, "mh", cfg->map_height);
     nvs_set_i32(h, "md", cfg->map_depth);
