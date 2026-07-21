@@ -1,4 +1,5 @@
-file(READ "${CMAKE_SOURCE_DIR}/VERSION" PIXELMAP_VERSION_RAW)
+# CMAKE_SOURCE_DIR may be the build dir during early IDF requirement scans.
+file(READ "${CMAKE_CURRENT_LIST_DIR}/../VERSION" PIXELMAP_VERSION_RAW)
 string(STRIP "${PIXELMAP_VERSION_RAW}" PIXELMAP_VERSION_STR)
 
 idf_component_register(
