@@ -15,6 +15,9 @@ struct pm_pixel_map {
     float width, height, depth;
 };
 
+static void ensure_grid_corners(pm_pixel_map_t *map, uint16_t *count, uint16_t limit,
+                                uint16_t w, uint16_t h, uint16_t d, float spacing, uint8_t group);
+
 esp_err_t pm_pixel_map_create(const pm_pixel_map_config_t *cfg, pm_pixel_map_t **out)
 {
     if (!cfg || !out || cfg->capacity == 0) return ESP_ERR_INVALID_ARG;
