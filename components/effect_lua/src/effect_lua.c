@@ -184,7 +184,8 @@ static int l_wrap_math1(lua_State *L, float (*fn)(float))
 static int l_sin(lua_State *L) { return l_wrap_math1(L, sinf); }
 static int l_cos(lua_State *L) { return l_wrap_math1(L, cosf); }
 static int l_abs(lua_State *L) { return l_wrap_math1(L, fabsf); }
-static int l_floor(lua_State *L) { return l_wrap_math1(L, floorf); }
+/* hl_floor — luaconf.h defines an l_floor() macro that would collide. */
+static int hl_floor(lua_State *L) { return l_wrap_math1(L, floorf); }
 
 static int l_atan2(lua_State *L)
 {
@@ -206,7 +207,7 @@ static void register_helpers(lua_State *L)
     lua_register(L, "sin", l_sin);
     lua_register(L, "cos", l_cos);
     lua_register(L, "abs", l_abs);
-    lua_register(L, "floor", l_floor);
+    lua_register(L, "floor", hl_floor);
     lua_register(L, "atan2", l_atan2);
 }
 

@@ -30,9 +30,9 @@ idf_component_register(
     INCLUDE_DIRS "include" "src"
 )
 
-target_compile_definitions(${COMPONENT_LIB} PUBLIC LUA_USE_C89)
-# Silence pedantic warnings from upstream Lua on GCC/Clang
-target_compile_options(${COMPONENT_LIB} PRIVATE
+# Silence pedantic warnings from upstream Lua on GCC/Clang.
+# PUBLIC so dependents including lua.h (e.g. lua_register comma-expr) also pass.
+target_compile_options(${COMPONENT_LIB} PUBLIC
     -Wno-unused-function
     -Wno-unused-parameter
     -Wno-unused-value
