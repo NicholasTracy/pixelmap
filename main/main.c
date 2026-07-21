@@ -2,12 +2,12 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "esp_vfs_spiffs.h"
 #include "nvs_flash.h"
 
 #include "config_store.h"
 #include "led_strip.h"
 #include "pixel_map.h"
+#include "map_store.h"
 #include "effects.h"
 #include "effect_lua.h"
 #include "pov.h"
@@ -130,12 +130,7 @@ static esp_err_t rebuild_strip(void)
 static void persist_map(void)
 {
     if (!s_map) return;
-    esp_err_t err = pm_pixel_map_save_path(s_map, MAP_PATH);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "map save failed: %s", esp_err_to_name(err));
-    } else {
-        ESP_LOGI(TAG, "map persisted (%u points)", (unsigned)pm_pixel_map_count(s_map));
-    }
+    pm_map_store_save(s_map);
 }
 
 static void sync_dmx_receivers(void)
@@ -204,21 +199,6 @@ static void apply_wifi_from_cfg(void)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "wifi apply failed: %s", esp_err_to_name(err));
     }
-}
-
-static esp_err_t mount_spiffs(void)
-{
-    esp_vfs_spiffs_conf_t conf = {
-        .base_path = "/spiffs",
-        .partition_label = "storage",
-        .max_files = 4,
-        .format_if_mount_failed = true,
-    };
-    esp_err_t err = esp_vfs_spiffs_register(&conf);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "SPIFFS mount failed: %s", esp_err_to_name(err));
-    }
-    return err;
 }
 
 static void update_status_led(bool dmx_active)
@@ -461,7 +441,7 @@ void app_main(void)
         ESP_LOGW(TAG, "lua init failed: %s", esp_err_to_name(err));
     }
 
-    mount_spiffs();
+    pm_map_store_mount();
 
     int avoid[PM_STRIP_MAX + 1];
     uint8_t avoid_n = 0;
@@ -484,7 +464,7 @@ void app_main(void)
         .width = 1, .height = 1, .depth = 1,
     };
     ESP_ERROR_CHECK(pm_pixel_map_create(&mc, &s_map));
-    if (pm_pixel_map_load_path(s_map, MAP_PATH) == ESP_OK && pm_pixel_map_count(s_map) > 0) {
+    if (pm_map_store_load(s_map) == ESP_OK && pm_pixel_map_count(s_map) > 0) {
         ESP_LOGI(TAG, "loaded persisted map (%u points)", (unsigned)pm_pixel_map_count(s_map));
     } else {
         apply_spatial_map();
