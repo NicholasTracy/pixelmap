@@ -240,7 +240,7 @@ Phases are sequential enough to ship value; items within a phase can parallelize
 
 **Goal:** What you edit in Map survives reboot.
 
-- [x] Mount SPIFFS (or LittleFS); save/load map JSON blob  
+- [x] Persist map JSON blob on `storage` partition (`map_store`)  
 - [x] Boot: load blob if present, else regenerate from layout params  
 - [x] Persist wire-order / CUSTOM maps  
 - [x] Expose color order (+ clock pin when SPI lands) in API/UI  
