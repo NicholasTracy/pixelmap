@@ -139,20 +139,20 @@ Use the matching `esp32s3` filenames for S3 boards. On some S3 modules the bootl
 
 After a successful flash:
 
-1. On your phone or computer, open Wi‑Fi settings
-2. Join the network named like **`PixelMap-XXXX`**
-3. Password: **`pixelmap1`**
-4. Open a browser to **[http://192.168.4.1](http://192.168.4.1)**
+1. Connect USB serial at **115200** baud and note the **SoftAP password** and **Web UI password** (printed once on first boot; SoftAP password is also logged each boot)
+2. On your phone or computer, join the Wi‑Fi network named like **`PixelMap-XXXX`** using that SoftAP password
+3. Open **[http://192.168.4.1](http://192.168.4.1)** and sign in with the web UI password
+4. Change the web UI password under Network (required if the yellow “bootstrap” banner is shown)
 
 From that page you can:
 
-- Connect the controller to your home/show Wi‑Fi
+- Scan and connect the controller to your home/show Wi‑Fi
 - Set LED chip type and pixel count
 - Build or drag-edit your pixel map
 - Pick a spatial effect
 - Turn on Art-Net / sACN and set universes
 
-When the controller joins your normal Wi‑Fi, use the IP address shown on that network instead of `192.168.4.1`.
+When the controller joins your normal Wi‑Fi, SoftAP turns off by default (unless you enable APSTA / AP fallback). Use the LAN IP or `hostname.local` instead of `192.168.4.1`.
 
 ---
 
@@ -297,30 +297,32 @@ If you assign GPIO 2 as LED data instead, the status LED is disabled automatical
 - SK6812 RGBW
 - TM1814
 
-APA102 / SK9822 use SPI (data + clock GPIO; one strip on SPI2). Color handling includes RGB, RGBW, HSV, gamma, and color correction. Web OTA, SoftAP / APSTA, mDNS (`hostname.local`), effect presets, optional secure web UI password, and factory reset are available in the Network tab.
+APA102 / SK9822 use SPI (data + clock GPIO; one strip on SPI2). Color handling includes RGB, RGBW, HSV, gamma, and color correction. Web OTA, SoftAP / APSTA, mDNS (`hostname.local`), effect presets, required web UI login, and factory reset are available in the Network tab.
 
 **Audio reactive:** optional I2S MEMS mic (INMP441-style). Enable under the Audio tab (WS / BCLK / DOUT GPIOs, gain, squelch). Use effects **Audio Pulse**, **Audio Ripple**, **Audio Spectrum**, or turn on “modulate intensity” for any effect. Bluetooth is not included.
 
 ---
 
-## Wi‑Fi, SoftAP, and OTA
+## Wi‑Fi, SoftAP, OTA, and security
 
-On first boot (or when STA is not configured), PixelMap starts a SoftAP:
+On first boot (or after factory reset), PixelMap generates **unique** SoftAP and web UI passwords and prints them on USB serial (115200). SoftAP starts when no STA network is configured:
 
 | | |
 |--|--|
 | SSID | `PixelMap-XXXX` (last bytes of MAC), or a custom AP SSID |
-| Password | `pixelmap1` by default (change in Network → SoftAP; min 8 chars) |
-| UI | `http://192.168.4.1/` |
+| SoftAP password | Unique per device (min 12 if you change it); never a shared default |
+| Web UI | Login always required; password stored as salted hash |
+| UI URL | `http://192.168.4.1/` (cleartext HTTP — treat SoftAP setup as physically trusted) |
 
 In the **Network** tab you can:
 
 - **Scan** for nearby Wi‑Fi networks and join as a client (STA)
-- **Enable SoftAP always** (APSTA) so phones can still reach `192.168.4.1` while the device is on your LAN
-- Use **AP fallback** (default on) so SoftAP comes up if STA disconnects
-- Opt in to a **secure web UI** password (login required for the whole UI, including OTA)
+- Optionally keep SoftAP on with STA (**APSTA**), or enable **AP fallback** if STA drops (both off by default once you are on a LAN)
+- Change SoftAP / web passwords (min 12 characters)
 
-**Web OTA:** Network → Firmware update. Upload the release **app** image (`pixelmap-esp32.bin` / `pixelmap-esp32s3.bin`), not the merged full-flash file. OTA works over SoftAP or STA (dual OTA partitions). Keep SoftAP enabled if you are updating from a phone without LAN access.
+**Web OTA:** Network → Firmware update. Upload the release **app** image (`pixelmap-esp32.bin` / `pixelmap-esp32s3.bin`), not the merged full-flash file. Requires login. OTA verifies image format via ESP-IDF; production SKUs should also enable Secure Boot + signed apps + flash encryption (see `docs/SECURITY.md`).
+
+**Transport:** The UI is HTTP (not HTTPS). On a hostile LAN, prefer SoftAP-only setup or isolate the device. Session cookies are `HttpOnly` + `SameSite=Lax` with an 8-hour idle timeout; login is rate-limited.
 
 ---
 

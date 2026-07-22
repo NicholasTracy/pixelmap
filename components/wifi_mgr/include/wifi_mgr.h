@@ -19,7 +19,7 @@ typedef struct {
     bool ap_fallback;
     /** SoftAP SSID; empty → PixelMap-XXXX from MAC. */
     const char *ap_ssid;
-    /** SoftAP password; empty → "pixelmap1". Must be ≥8 chars for WPA2. */
+    /** SoftAP password; required ≥8 chars (unique per device). Never open AP. */
     const char *ap_pass;
 } pm_wifi_config_t;
 

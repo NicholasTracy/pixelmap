@@ -481,6 +481,15 @@ void app_main(void)
         ESP_LOGW(TAG, "config load failed (%s); using defaults", esp_err_to_name(err));
         pm_config_set_defaults(&s_cfg);
     }
+    if (pm_config_ensure_security(&s_cfg)) {
+        if (pm_config_save(&s_cfg) != ESP_OK) {
+            ESP_LOGE(TAG, "failed to persist security credentials");
+        }
+    }
+    /* SoftAP PSK is recoverable via UART (physical access). Web password is not. */
+    if (s_cfg.ap_pass[0]) {
+        ESP_LOGI(TAG, "SoftAP password: %s", s_cfg.ap_pass);
+    }
     err = pm_effect_lua_init();
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "lua init failed: %s", esp_err_to_name(err));

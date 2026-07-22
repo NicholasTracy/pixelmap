@@ -169,36 +169,33 @@ body{
       </div>
       <div class="pm-panel mt-3">
         <h2 class="pm-section-title">SoftAP (access point)</h2>
-        <p class="pm-help">Combine with client mode (APSTA) so phones can always reach the UI at <code>192.168.4.1</code> while the device is also on your LAN.</p>
+        <p class="pm-help">Each device gets a unique SoftAP password (printed on USB serial at 115200). SoftAP stays off while STA is healthy unless you force it on. UI: <code>192.168.4.1</code>.</p>
         <div class="row g-3">
           <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">
             <input class="form-check-input" type="checkbox" id="apen"/>
-            <label class="form-check-label" for="apen">Enable SoftAP (always on)</label>
+            <label class="form-check-label" for="apen">Keep SoftAP on with STA (APSTA)</label>
           </div></div>
           <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" id="apfb" checked/>
+            <input class="form-check-input" type="checkbox" id="apfb"/>
             <label class="form-check-label" for="apfb">AP fallback if STA disconnects</label>
           </div></div>
           <div class="col-md-6"><label class="form-label" for="apssid">AP SSID</label>
             <input class="form-control" id="apssid" placeholder="Blank → PixelMap-XXXX"/>
           </div>
           <div class="col-md-6"><label class="form-label" for="appass">AP password</label>
-            <input class="form-control" id="appass" type="password" placeholder="Leave blank to keep (min 8)" autocomplete="new-password"/>
-            <p class="pm-help mb-0 mt-1" id="apPassHint" hidden>An AP password is stored (not shown). Default first boot: <code>pixelmap1</code>.</p>
+            <input class="form-control" id="appass" type="password" placeholder="Leave blank to keep (min 12)" autocomplete="new-password"/>
+            <p class="pm-help mb-0 mt-1" id="apPassHint" hidden>An AP password is stored (not shown). Also logged on UART each boot.</p>
           </div>
         </div>
       </div>
       <div class="pm-panel mt-3">
-        <h2 class="pm-section-title">Secure web UI</h2>
-        <p class="pm-help">Opt-in password gate for the entire UI (including OTA). After enabling, you’ll be asked to sign in.</p>
+        <h2 class="pm-section-title">Web UI password</h2>
+        <p class="pm-help">Login is always required. Password is stored as a salted hash. First-boot password is only shown once on USB serial.</p>
+        <div class="alert alert-warning py-2 px-3" id="webRotateBanner" hidden>Change the bootstrap web password before deploying (min 12 characters).</div>
         <div class="row g-3">
-          <div class="col-md-6 d-flex align-items-end"><div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" id="webAuth"/>
-            <label class="form-check-label" for="webAuth">Require password to open web UI</label>
-          </div></div>
-          <div class="col-md-6"><label class="form-label" for="webpass">Web UI password</label>
-            <input class="form-control" id="webpass" type="password" maxlength="32" placeholder="Leave blank to keep / clear when disabling" autocomplete="new-password"/>
-            <p class="pm-help mb-0 mt-1" id="pinHint" hidden>A web password is set.</p>
+          <div class="col-md-6"><label class="form-label" for="webpass">New web UI password</label>
+            <input class="form-control" id="webpass" type="password" maxlength="64" placeholder="Leave blank to keep" autocomplete="new-password"/>
+            <p class="pm-help mb-0 mt-1" id="pinHint" hidden>A web password hash is set.</p>
           </div>
         </div>
         <button class="btn btn-outline-secondary btn-sm mt-2" type="button" id="webLogout">Sign out this browser</button>
@@ -1423,16 +1420,9 @@ function applyFxConfig(c){
 function apiHeaders(extra){
   const h = Object.assign({'Content-Type':'application/json'}, extra || {});
   let tok = '';
-  try { tok = sessionStorage.getItem('pm_auth') || sessionStorage.getItem('pm_pin') || ''; } catch (_) {}
-  const typed = (document.getElementById('webpass') && webpass.value) || '';
-  if (typed) {
-    tok = typed;
-    try { sessionStorage.setItem('pm_auth', typed); } catch (_) {}
-  }
-  if (tok) {
-    h['X-PixelMap-Auth'] = tok;
-    h['X-PixelMap-Pin'] = tok; /* legacy */
-  }
+  try { tok = sessionStorage.getItem('pm_auth') || ''; } catch (_) {}
+  /* Session token only — never send the web password as a bearer. */
+  if (tok) h['X-PixelMap-Auth'] = tok;
   return h;
 }
 
@@ -1459,7 +1449,7 @@ function collectConfig(){
     apen:!!document.getElementById('apen')?.checked,
     apfb:!!document.getElementById('apfb')?.checked,
     apssid:(document.getElementById('apssid')?.value || '').trim(),
-    webAuth:!!document.getElementById('webAuth')?.checked,
+    webAuth:true,
     gpio:+gpio.value, clk:+clk.value, sled:+sled.value, sledh:sledh.checked,
     count:total, scnt:stripCount(), slens, sgpios,
     bri:+bri.value, gamma:+gamma.value, aw:!!aw.checked,
@@ -1490,7 +1480,7 @@ function collectConfig(){
 
 async function saveConfig(statusEl, note){
   const body = collectConfig();
-  const r = await fetch('/api/config',{method:'POST',headers:apiHeaders(),body:JSON.stringify(body)});
+  const r = await fetch('/api/config',{method:'POST',credentials:'same-origin',headers:apiHeaders(),body:JSON.stringify(body)});
   let errDetail = '';
   let j = null;
   try { j = await r.json(); } catch (_) {}
@@ -2078,15 +2068,16 @@ async function loadCfg(){
   const passHint = document.getElementById('passHint');
   if (passHint) passHint.hidden = !c.passSet;
   if (document.getElementById('apen')) apen.checked = !!c.apen;
-  if (document.getElementById('apfb')) apfb.checked = c.apfb !== false;
+  if (document.getElementById('apfb')) apfb.checked = !!c.apfb;
   if (document.getElementById('apssid')) apssid.value = c.apssid || '';
   if (document.getElementById('appass')) appass.value = '';
   const apPassHint = document.getElementById('apPassHint');
   if (apPassHint) apPassHint.hidden = !c.apPassSet;
-  if (document.getElementById('webAuth')) webAuth.checked = !!c.webAuth;
   if (document.getElementById('webpass')) webpass.value = '';
   const pinHint = document.getElementById('pinHint');
   if (pinHint) pinHint.hidden = !(c.webPassSet || c.pinSet);
+  const rot = document.getElementById('webRotateBanner');
+  if (rot) rot.hidden = !c.webPassRotate;
   const mdnsHint = document.getElementById('mdnsHint');
   if (mdnsHint) mdnsHint.textContent = c.host || 'pixelmap';
   refreshWifiStatus();
@@ -4528,13 +4519,12 @@ document.getElementById('webLogout')?.addEventListener('click', async () => {
 });
 
 saveNetwork.onclick=async()=>{
-  const haveWebPass = document.getElementById('pinHint') && !pinHint.hidden;
-  if (webAuth.checked && !webpass.value && !haveWebPass) {
-    setStatus(statusNetwork, false, 'Set a web UI password when enabling secure UI');
+  if (webpass.value && webpass.value.length < 12) {
+    setStatus(statusNetwork, false, 'Web UI password must be at least 12 characters');
     return;
   }
-  if (appass.value && appass.value.length < 8) {
-    setStatus(statusNetwork, false, 'AP password must be at least 8 characters');
+  if (appass.value && appass.value.length < 12) {
+    setStatus(statusNetwork, false, 'AP password must be at least 12 characters');
     return;
   }
   const ok = await saveConfig(statusNetwork,'Saved. Wi‑Fi / SoftAP apply immediately.');
@@ -4615,9 +4605,16 @@ document.getElementById('otaUpload')?.addEventListener('click', async () => {
 });
 
 document.getElementById('factoryReset')?.addEventListener('click', async () => {
-  if (!confirm('Factory reset erases config, map, presets, and Lua. Continue?')) return;
-  const r = await fetch('/api/factory_reset', {method:'POST', headers:apiHeaders(), body:'{}'});
-  setStatus(statusFactory, r.ok, r.ok ? 'Reset OK — rebooting…' : ((r.status===401||r.status===403)?'Password required':'Reset failed'));
+  if (!confirm('Factory reset erases config, map, presets, and Lua, then regenerates unique SoftAP/web passwords. Continue?')) return;
+  const confirmPass = prompt('Re-enter web UI password to confirm factory reset:');
+  if (confirmPass == null) return;
+  const r = await fetch('/api/factory_reset', {
+    method:'POST',
+    headers:apiHeaders(),
+    credentials:'same-origin',
+    body: JSON.stringify({confirmPass})
+  });
+  setStatus(statusFactory, r.ok, r.ok ? 'Reset OK — rebooting… check serial for new passwords' : ((r.status===401||r.status===403)?'Password incorrect':'Reset failed'));
 });
 
 buildGrid.onclick=async()=>{

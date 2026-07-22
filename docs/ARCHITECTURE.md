@@ -54,16 +54,20 @@ Optional I2S MEMS mic (`components/audio`, INMP441-style: WS / BCLK / DOUT). A l
 ## Wi‑Fi (`wifi_mgr`)
 
 - **STA** — join a home/venue network (SSID/password from NVS).
-- **SoftAP** — `PixelMap-XXXX` (or custom SSID), default password `pixelmap1` (changeable; min 8 chars). UI at `http://192.168.4.1/`.
-- **APSTA** — SoftAP always on (`apen`) while also on STA, or **AP fallback** (`apfb`, default on) when STA drops.
+- **SoftAP** — `PixelMap-XXXX` (or custom SSID), **unique** WPA2 PSK from `pm_config_ensure_security` (never open, never shared default). UI at `http://192.168.4.1/`.
+- **APSTA** — SoftAP forced on (`apen`) with STA, or **AP fallback** (`apfb`, default **off**) when STA drops. SoftAP drops when STA becomes healthy unless `apen`.
 - **Scan** — blocking `pm_wifi_scan` via `GET /api/wifi/scan` (forces APSTA briefly if AP-only).
 - **mDNS** — `hostname.local` HTTP service.
+
+## Security (`security` + `config_store`)
+
+See [SECURITY.md](SECURITY.md). `pm_config_ensure_security()` runs after load: unique SoftAP PSK, hashed web password, `web_auth` forced on. UART prints bootstrap secrets.
 
 ## Web UI
 
 Embedded single-page app (`components/web_ui/index.html`) served by `esp_http_server`.
 
-Opt-in **secure web UI** (`webAuth` + `webpass`): login page + session cookie `pm_sess` / header `X-PixelMap-Auth`. Gates all API routes except `/api/auth*`. OTA uses the same gate. Legacy short `ui_pin` migrates into `web_pass` if unset.
+**Web UI auth is always required:** login page + `HttpOnly` session cookie `pm_sess` / header `X-PixelMap-Auth` (session token only). Gates all API routes except `GET/POST /api/auth`. Passwords are never accepted as bearers. OTA and factory reset require a session; factory reset also requires `confirmPass`.
 
 | Route | Purpose |
 |-------|---------|

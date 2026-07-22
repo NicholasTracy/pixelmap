@@ -35,18 +35,19 @@ static void apply_ap_config(void)
         snprintf((char *)ap.ap.ssid, sizeof(ap.ap.ssid), "PixelMap-%02X%02X", mac[4], mac[5]);
     }
 
-    const char *pass = s_ap_pass[0] ? s_ap_pass : "pixelmap1";
-    size_t plen = strlen(pass);
-    if (plen > 0 && plen < 8) {
-        ESP_LOGW(TAG, "AP password < 8 chars; using default pixelmap1");
-        pass = "pixelmap1";
-        plen = 9;
+    /* Never open SoftAP. Empty/short password is a config bug — refuse open auth. */
+    const char *pass = s_ap_pass;
+    size_t plen = pass ? strlen(pass) : 0;
+    if (plen < 8) {
+        ESP_LOGE(TAG, "SoftAP password missing/short; AP will not start open");
+        s_ap_up = false;
+        return;
     }
     strncpy((char *)ap.ap.password, pass, sizeof(ap.ap.password) - 1);
     ap.ap.ssid_len = strlen((char *)ap.ap.ssid);
     ap.ap.channel = 1;
     ap.ap.max_connection = 4;
-    ap.ap.authmode = (plen == 0) ? WIFI_AUTH_OPEN : WIFI_AUTH_WPA_WPA2_PSK;
+    ap.ap.authmode = WIFI_AUTH_WPA2_PSK;
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap));
     s_ap_up = true;
     strncpy(s_ap_ip, "192.168.4.1", sizeof(s_ap_ip) - 1);
@@ -98,9 +99,9 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         s_sta_connecting = false;
         snprintf(s_sta_ip, sizeof(s_sta_ip), IPSTR, IP2STR(&e->ip_info.ip));
         ESP_LOGI(TAG, "STA IP %s", s_sta_ip);
-        /* If AP was only for fallback and not forced, can leave APSTA when connected */
-        if (!s_ap_enable && s_ap_fallback) {
-            /* Keep APSTA so clients already on SoftAP are not kicked; user can disable AP. */
+        /* Drop SoftAP when STA is healthy unless SoftAP is explicitly forced on. */
+        if (!s_ap_enable) {
+            set_mode_for_state();
         }
     }
 }

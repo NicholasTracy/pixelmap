@@ -3,6 +3,7 @@
 #include "led_chipsets.h"
 #include "effects.h"
 #include "pov.h"
+#include "pm_security.h"
 #include "esp_err.h"
 #include <stdint.h>
 #include <stdbool.h>
@@ -133,13 +134,16 @@ typedef struct {
     float pov_path_length_m;
 
     /**
-     * Opt-in web UI password. When web_auth is true and web_pass is set,
-     * all UI/API access requires a login session (except /api/auth).
-     * Legacy ui_pin (≤7 chars) still accepted as web_pass if web_pass empty.
+     * Web UI auth is always required in production builds when a password hash
+     * is present. web_auth is kept for NVS compatibility; ensure_security forces it on.
+     * web_pass holds a salted SHA-256 hash ($5$salt$hex), never the plaintext.
      */
     bool web_auth;
-    char web_pass[33];
+    char web_pass[PM_SECURITY_HASH_MAX];
+    /** Legacy short PIN; migrated into web_pass hash then cleared. */
     char ui_pin[8];
+    /** True until the user sets a new web password (≥12 chars) after bootstrap/migration. */
+    bool web_pass_rotate;
     /** Estimated mA per LED at full white (UI power guidance). */
     uint16_t ma_per_led;
 
@@ -178,6 +182,15 @@ void pm_config_apply_fx_dmx(pm_app_config_t *cfg, const uint8_t *merge, size_t m
 void pm_config_apply_fx_mods(pm_app_config_t *cfg, uint32_t time_ms);
 esp_err_t pm_config_load(pm_app_config_t *cfg);
 esp_err_t pm_config_save(const pm_app_config_t *cfg);
+
+/**
+ * Enforce production security defaults after load:
+ * unique SoftAP PSK, hashed web password, web_auth on.
+ * If credentials were generated, plaintext is logged once to UART and
+ * *out_saved should trigger pm_config_save.
+ * Returns true if cfg was modified.
+ */
+bool pm_config_ensure_security(pm_app_config_t *cfg);
 
 #ifdef __cplusplus
 }

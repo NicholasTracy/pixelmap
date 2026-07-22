@@ -4,7 +4,7 @@ string(STRIP "${PIXELMAP_VERSION_RAW}" PIXELMAP_VERSION_STR)
 idf_component_register(
     SRCS "src/web_ui.c"
     INCLUDE_DIRS "include"
-    REQUIRES esp_http_server json config_store mapping led_driver color effect_lua ota_update presets map_store freertos audio wifi_mgr
+    REQUIRES esp_http_server json config_store mapping led_driver color effect_lua ota_update presets map_store freertos audio wifi_mgr security esp_timer
     EMBED_TXTFILES
         "index.html"
         "vendor/bootstrap.min.css"

@@ -1,12 +1,16 @@
 #include "config_store.h"
+#include "pm_security.h"
 #include "nvs_flash.h"
 #include "nvs.h"
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
+
+static const char *TAG = "config";
 
 static SemaphoreHandle_t s_cfg_mtx;
 
@@ -104,11 +108,12 @@ void pm_config_set_defaults(pm_app_config_t *cfg)
     memset(cfg, 0, sizeof(*cfg));
     strncpy(cfg->hostname, "pixelmap", sizeof(cfg->hostname) - 1);
     cfg->ap_enable = false;
-    cfg->ap_fallback = true;
+    cfg->ap_fallback = false; /* recovery SoftAP is opt-in; SoftAP PSK is unique when used */
     cfg->ap_ssid[0] = '\0';
-    strncpy(cfg->ap_pass, "pixelmap1", sizeof(cfg->ap_pass) - 1);
-    cfg->web_auth = false;
+    cfg->ap_pass[0] = '\0'; /* filled by pm_config_ensure_security */
+    cfg->web_auth = true;
     cfg->web_pass[0] = '\0';
+    cfg->web_pass_rotate = true;
     cfg->gpio_data = pm_config_default_strip_gpio(0);
     cfg->gpio_clock = 14;
     cfg->gpio_status_led = 2; /* ESP32 DevKit / common WLED onboard LED */
@@ -383,6 +388,7 @@ esp_err_t pm_config_load(pm_app_config_t *cfg)
     if (nvs_get_i32(h, "webauth", &v) == ESP_OK) cfg->web_auth = v != 0;
     len = sizeof(cfg->web_pass);
     nvs_get_str(h, "webpass", cfg->web_pass, &len);
+    if (nvs_get_i32(h, "webrot", &v) == ESP_OK) cfg->web_pass_rotate = v != 0;
     if (nvs_get_i32(h, "gpio", &v) == ESP_OK) cfg->gpio_data = v;
     if (nvs_get_i32(h, "clk", &v) == ESP_OK) cfg->gpio_clock = v;
     if (nvs_get_i32(h, "sled", &v) == ESP_OK) cfg->gpio_status_led = v;
@@ -521,14 +527,75 @@ esp_err_t pm_config_load(pm_app_config_t *cfg)
     if (nvs_get_i32(h, "povpath", &v) == ESP_OK) cfg->pov_path_length_m = (float)v / 1000.0f;
 
     nvs_close(h);
-    /* Migrate legacy short UI PIN into web_pass when unset. */
-    if (!cfg->web_pass[0] && cfg->ui_pin[0]) {
-        strncpy(cfg->web_pass, cfg->ui_pin, sizeof(cfg->web_pass) - 1);
-        cfg->web_pass[sizeof(cfg->web_pass) - 1] = '\0';
-    }
     coerce_unsupported_chipset(cfg);
     pm_config_sync_strips(cfg);
     return ESP_OK;
+}
+
+bool pm_config_ensure_security(pm_app_config_t *cfg)
+{
+    if (!cfg) return false;
+    bool dirty = false;
+    char web_plain[PM_SECURITY_GEN_LEN + 1] = {0};
+    bool log_web = false;
+    bool log_ap = false;
+
+    cfg->web_auth = true;
+
+    if (pm_security_is_insecure_ap_pass(cfg->ap_pass)) {
+        if (pm_security_random_password(cfg->ap_pass, sizeof(cfg->ap_pass)) != ESP_OK) {
+            ESP_LOGE(TAG, "failed to generate SoftAP password");
+        } else {
+            dirty = true;
+            log_ap = true;
+        }
+    }
+
+    /* Migrate legacy ui_pin → temporary plaintext in web_pass for hashing below. */
+    if (!cfg->web_pass[0] && cfg->ui_pin[0]) {
+        strncpy(cfg->web_pass, cfg->ui_pin, sizeof(cfg->web_pass) - 1);
+        cfg->web_pass[sizeof(cfg->web_pass) - 1] = '\0';
+        cfg->ui_pin[0] = '\0';
+        cfg->web_pass_rotate = true;
+        dirty = true;
+    }
+
+    if (!cfg->web_pass[0]) {
+        if (pm_security_random_password(web_plain, sizeof(web_plain)) != ESP_OK) {
+            ESP_LOGE(TAG, "failed to generate web UI password");
+        } else if (pm_security_hash_password(web_plain, cfg->web_pass, sizeof(cfg->web_pass)) == ESP_OK) {
+            cfg->web_pass_rotate = true;
+            dirty = true;
+            log_web = true;
+        }
+    } else if (!pm_security_is_hashed(cfg->web_pass)) {
+        /* Upgrade legacy plaintext web_pass to salted hash. */
+        char tmp[PM_SECURITY_HASH_MAX];
+        if (pm_security_hash_password(cfg->web_pass, tmp, sizeof(tmp)) == ESP_OK) {
+            if (!pm_security_password_ok(cfg->web_pass)) cfg->web_pass_rotate = true;
+            memset(cfg->web_pass, 0, sizeof(cfg->web_pass));
+            strncpy(cfg->web_pass, tmp, sizeof(cfg->web_pass) - 1);
+            dirty = true;
+            ESP_LOGW(TAG, "Migrated web UI password to salted hash (plaintext cleared from NVS on save)");
+        }
+    }
+
+    if (log_ap || log_web) {
+        ESP_LOGW(TAG, "======== PixelMap setup credentials (save these) ========");
+        if (log_ap) {
+            ESP_LOGW(TAG, "SoftAP password: %s", cfg->ap_pass);
+        }
+        if (log_web) {
+            ESP_LOGW(TAG, "Web UI password: %s", web_plain);
+            ESP_LOGW(TAG, "Web password is hashed at rest and will not be shown again.");
+        }
+        ESP_LOGW(TAG, "Connect USB serial at 115200 if you need to re-read SoftAP password.");
+        ESP_LOGW(TAG, "Factory reset regenerates both secrets.");
+        ESP_LOGW(TAG, "========================================================");
+        memset(web_plain, 0, sizeof(web_plain));
+    }
+
+    return dirty;
 }
 
 esp_err_t pm_config_save(const pm_app_config_t *cfg)
@@ -550,8 +617,9 @@ esp_err_t pm_config_save(const pm_app_config_t *cfg)
     nvs_set_i32(h, "apfb", cfg->ap_fallback ? 1 : 0);
     nvs_set_str(h, "apssid", cfg->ap_ssid);
     nvs_set_str(h, "appass", cfg->ap_pass);
-    nvs_set_i32(h, "webauth", cfg->web_auth ? 1 : 0);
+    nvs_set_i32(h, "webauth", 1); /* production: always on */
     nvs_set_str(h, "webpass", cfg->web_pass);
+    nvs_set_i32(h, "webrot", cfg->web_pass_rotate ? 1 : 0);
     nvs_set_i32(h, "gpio", cfg->gpio_data);
     nvs_set_i32(h, "clk", cfg->gpio_clock);
     nvs_set_i32(h, "sled", cfg->gpio_status_led);
