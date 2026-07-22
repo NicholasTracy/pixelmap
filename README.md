@@ -172,6 +172,8 @@ You can change pins in the UI. The status LED “breathes” differently for boo
 
 ## For developers
 
+Pull requests get automatic **area** and **size** labels plus a triage comment (changed areas, largest diffs, suggested checks). See `.github/workflows/pr-automation.yml`.
+
 Preview the UI without hardware:
 
 ```bash

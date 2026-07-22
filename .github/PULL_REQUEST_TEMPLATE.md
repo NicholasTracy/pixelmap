@@ -1,8 +1,20 @@
 ## Summary
+<!-- What changed and why (1–3 bullets). -->
+-
+
+## Reviewer focus
+<!-- What should a reviewer look at first? -->
 -
 
 ## Test plan
-- [ ] `idf.py build` succeeds for target board
-- [ ] WiFi AP/STA and web UI load
-- [ ] Spatial effect renders on strip
-- [ ] Art-Net / sACN overrides effects when streaming
+- [ ] CI is green on this PR
+- [ ] Flashed or simulated the affected paths (note how below)
+- [ ] Web UI loads after change (if UI / network / setup touched)
+- [ ] LED output still looks correct (if strip / effects / map touched)
+
+### How I tested
+<!-- e.g. ESP32 DevKit, SoftAP wizard, virtbench only, etc. -->
+
+## Risk / notes
+<!-- Breaking changes, migration, security, or “none”. -->
+-

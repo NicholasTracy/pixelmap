@@ -1,0 +1,9 @@
+# Default reviewer for all changes
+* @NicholasTracy
+
+# Area owners (same for now; split later if the team grows)
+/.github/ @NicholasTracy
+/components/web_ui/ @NicholasTracy
+/components/wifi_mgr/ @NicholasTracy
+/components/security/ @NicholasTracy
+/docs/ @NicholasTracy

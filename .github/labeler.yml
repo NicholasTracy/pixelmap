@@ -1,0 +1,73 @@
+# Path-based labels for pull requests (used by .github/workflows/pr-automation.yml)
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'README.md'
+          - 'docs/**'
+          - 'boards/**'
+          - 'LICENSE'
+          - '**/*.md'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+
+web-ui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'components/web_ui/**'
+
+wifi-network:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'components/wifi_mgr/**'
+          - 'components/security/**'
+
+firmware-core:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'main/**'
+          - 'components/config_store/**'
+          - 'partitions.csv'
+          - 'sdkconfig.defaults'
+          - 'CMakeLists.txt'
+
+leds-effects:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'components/led_driver/**'
+          - 'components/color/**'
+          - 'components/effects/**'
+          - 'components/effect_lua/**'
+          - 'components/lua/**'
+          - 'components/pov/**'
+          - 'components/status_led/**'
+
+mapping:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'components/mapping/**'
+          - 'components/map_store/**'
+
+dmx-protocols:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'components/artnet/**'
+          - 'components/sacn/**'
+
+audio:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'components/audio/**'
+
+ota:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'components/ota_update/**'
+
+tools:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tools/**'
