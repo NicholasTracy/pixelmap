@@ -9,8 +9,10 @@
 extern "C" {
 #endif
 
-/** Minimum length for web UI / SoftAP passwords in production. */
+/** Minimum length for web UI / SoftAP passwords when set. */
 #define PM_SECURITY_PASS_MIN 12
+/** SoftAP password used only during first-boot / post-reset setup wizard. */
+#define PM_SETUP_AP_PASS "pixelmap1"
 /** Generated secret length (alphanumeric). */
 #define PM_SECURITY_GEN_LEN 16
 /** Stored web password hash: $5$<16 hex salt>$<64 hex sha256> */

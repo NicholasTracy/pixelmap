@@ -54,28 +54,31 @@ Optional I2S MEMS mic (`components/audio`, INMP441-style: WS / BCLK / DOUT). A l
 ## Wi‑Fi (`wifi_mgr`)
 
 - **STA** — join a home/venue network (SSID/password from NVS).
-- **SoftAP** — `PixelMap-XXXX` (or custom SSID), **unique** WPA2 PSK from `pm_config_ensure_security` (never open, never shared default). UI at `http://192.168.4.1/`.
-- **APSTA** — SoftAP forced on (`apen`) with STA, or **AP fallback** (`apfb`, default **off**) when STA drops. SoftAP drops when STA becomes healthy unless `apen`.
+- **SoftAP** — `PixelMap-XXXX` (or custom SSID), WPA2. Setup wizard uses `pixelmap1`; never open auth. UI at `http://192.168.4.1/`.
+- **APSTA** — SoftAP with STA when `apen` (wizard default on). **AP fallback** (`apfb`, default off) when STA drops. SoftAP drops when STA healthy unless `apen`.
 - **Scan** — blocking `pm_wifi_scan` via `GET /api/wifi/scan` (forces APSTA briefly if AP-only).
 - **mDNS** — `hostname.local` HTTP service.
 
 ## Security (`security` + `config_store`)
 
-See [SECURITY.md](SECURITY.md). `pm_config_ensure_security()` runs after load: unique SoftAP PSK, hashed web password, `web_auth` forced on. UART prints bootstrap secrets.
+See [SECURITY.md](SECURITY.md). `setup_complete` gates a SoftAP wizard (`pixelmap1`). Optional web auth stores salted password hashes. Open UI allowed when auth is cleared.
 
 ## Web UI
 
-Embedded single-page app (`components/web_ui/index.html`) served by `esp_http_server`.
+Embedded SPA + first-boot **setup wizard** HTML in `web_ui.c`.
 
-**Web UI auth is always required:** login page + `HttpOnly` session cookie `pm_sess` / header `X-PixelMap-Auth` (session token only). Gates all API routes except `GET/POST /api/auth`. Passwords are never accepted as bearers. OTA and factory reset require a session; factory reset also requires `confirmPass`.
+While `!setup_complete`, only `/`, vendor assets, and `/api/setup/*` are usable. After setup, optional login (`HttpOnly` session / `X-PixelMap-Auth` token). Factory reset requires `confirmPass` when auth is on.
 
 | Route | Purpose |
 |-------|---------|
-| `GET /` | Editor UI (login HTML if auth required) |
+| `GET /` | Setup wizard, login page, or editor UI |
 | `GET /vendor/bootstrap.min.css` | Bootstrap CSS (embedded) |
 | `GET /vendor/bootstrap.bundle.min.js` | Bootstrap JS (embedded) |
 | `GET/POST /api/auth` | Auth status / login (`token` + Set-Cookie) |
 | `POST /api/auth/logout` | Clear session |
+| `GET /api/setup/status` | Wizard status (unauthenticated during setup) |
+| `GET /api/setup/scan` | Wi‑Fi scan during setup |
+| `POST /api/setup/complete` | Finish wizard (STA/APSTA/auth) |
 | `GET /api/wifi/status` | STA/AP mode, IPs, SSIDs |
 | `GET /api/wifi/scan` | Nearby SSIDs (RSSI) |
 | `GET/POST /api/config` | Device + strip + Wi‑Fi/AP/auth settings (`pass` never returned on GET) |

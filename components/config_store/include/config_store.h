@@ -77,6 +77,11 @@ typedef struct {
     bool ap_fallback;
     char ap_ssid[PM_WIFI_SSID_MAX];
     char ap_pass[PM_WIFI_PASS_MAX];
+    /**
+     * False on first boot / after factory reset until the SoftAP setup wizard finishes.
+     * While false, SoftAP uses PM_SETUP_AP_PASS and the walled wizard is served.
+     */
+    bool setup_complete;
 
     int gpio_data;                  /* alias of strip_gpio[0] (legacy / single-strip) */
     int gpio_clock;
@@ -134,15 +139,15 @@ typedef struct {
     float pov_path_length_m;
 
     /**
-     * Web UI auth is always required in production builds when a password hash
-     * is present. web_auth is kept for NVS compatibility; ensure_security forces it on.
-     * web_pass holds a salted SHA-256 hash ($5$salt$hex), never the plaintext.
+     * When true and web_pass is set, UI/API require a login session.
+     * Blank password (web_auth=false, empty web_pass) leaves the UI open — warned in UI.
+     * web_pass holds a salted SHA-256 hash ($5$salt$hex) when auth is on.
      */
     bool web_auth;
     char web_pass[PM_SECURITY_HASH_MAX];
     /** Legacy short PIN; migrated into web_pass hash then cleared. */
     char ui_pin[8];
-    /** True until the user sets a new web password (≥12 chars) after bootstrap/migration. */
+    /** True until the user sets a new web password (≥12 chars) after bootstrap. */
     bool web_pass_rotate;
     /** Estimated mA per LED at full white (UI power guidance). */
     uint16_t ma_per_led;
@@ -184,11 +189,10 @@ esp_err_t pm_config_load(pm_app_config_t *cfg);
 esp_err_t pm_config_save(const pm_app_config_t *cfg);
 
 /**
- * Enforce production security defaults after load:
- * unique SoftAP PSK, hashed web password, web_auth on.
- * If credentials were generated, plaintext is logged once to UART and
- * *out_saved should trigger pm_config_save.
- * Returns true if cfg was modified.
+ * Normalize security / setup state after load.
+ * Incomplete setup → SoftAP uses PM_SETUP_AP_PASS for the wizard (no serial required).
+ * Completed setup → migrate legacy plaintext web passwords to hashes.
+ * Returns true if cfg was modified (caller should save).
  */
 bool pm_config_ensure_security(pm_app_config_t *cfg);
 

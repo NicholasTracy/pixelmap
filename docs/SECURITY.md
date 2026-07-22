@@ -1,44 +1,41 @@
 # PixelMap security model
 
-## Defaults (production-oriented)
+## First-boot SoftAP wizard (no USB serial)
+
+On first flash or after factory reset (`setup_complete = false`):
+
+1. Join Wi‑Fi **`PixelMap-XXXX`** with password **`pixelmap1`**
+2. Open **http://192.168.4.1/** — a walled setup wizard is served (main UI/API blocked)
+3. Choose venue Wi‑Fi (optional), SoftAP options (**APSTA** default on), and web UI password
+4. Leave web password blank + acknowledge → **open UI** (warned)
+5. Finish → normal UI; SoftAP password remains `pixelmap1` unless you changed it
+
+## Defaults after setup
 
 | Control | Behavior |
 |---------|----------|
-| Web UI auth | Always required once credentials exist (forced on first boot) |
-| SoftAP password | Unique random (≥16 chars); never `pixelmap1` |
-| Web password storage | Salted SHA-256 (`$5$salt$hex`); plaintext only on first UART print |
-| SoftAP while on LAN | Off when STA is healthy unless APSTA or AP fallback enabled |
-| AP fallback | Off by default |
-| Sessions | 128-bit token, `HttpOnly` + `SameSite=Lax`, 8 h sliding TTL |
+| Web UI auth | Optional — set a password (≥12) or leave open with acknowledgement |
+| SoftAP password | Setup default `pixelmap1` until changed (min 12 when changing) |
+| SoftAP + STA | APSTA selectable in wizard (default on); SoftAP drops when STA healthy if APSTA off |
+| AP fallback | Off by default; opt-in in wizard / Network tab |
+| Sessions | When auth on: 128-bit token, `HttpOnly` + `SameSite=Lax`, 8 h idle TTL |
 | Login | Rate-limited (5 failures → 60 s lockout) |
-| Factory reset | Session + re-entered web password |
-| OTA | Session required; ESP-IDF image checks (not signature by default) |
+| Factory reset | Session + re-entered password (if auth on); returns to SoftAP wizard |
 
-## First boot / recovery
+## Disabling web auth later
 
-1. Open USB serial at **115200**.
-2. Copy **SoftAP password** and **Web UI password** from the log.
-3. Join `PixelMap-XXXX`, open `http://192.168.4.1`, sign in.
-4. Change the web password (banner) before leaving the device unattended.
-
-SoftAP password is also logged on each boot (physical UART access). The web password is **not** shown again; factory reset regenerates both.
+Network → uncheck **Require password**, leave password blank, confirm the warning. Clears the stored hash.
 
 ## Threat model
 
-- **Trusted:** USB serial / physical possession, SoftAP clients who know the unique SoftAP PSK during setup.
-- **Not trusted by default:** Shared LAN peers (HTTP is cleartext), SoftAP with a leaked PSK.
-- **Not covered yet in stock builds:** TLS, Secure Boot, flash encryption, signed OTA. Enable these in a production SKU `sdkconfig` if you ship commercial hardware.
-
-## Recommended production SKU extras (ESP-IDF)
-
-- `CONFIG_SECURE_BOOT` + signed app images in CI
-- `CONFIG_SECURE_FLASH_ENC_ENABLED` (flash encryption)
-- Custom partition / NVS encryption as needed
-- Prefer isolating controllers on a show/control VLAN
+- **Setup SoftAP** uses a **known** password (`pixelmap1`) so phones can onboard without serial. Treat first-boot SoftAP as physically trusted / short-lived.
+- After setup, change SoftAP and enable web auth on any shared or hostile network.
+- UI remains **HTTP** (not HTTPS). Prefer isolating controllers on a show VLAN for venues.
+- Stock builds do not enable Secure Boot / flash encryption / signed OTA — see ESP-IDF for commercial SKUs.
 
 ## Operator checklist
 
-1. Change bootstrap web password (≥12 chars).
-2. Join venue Wi‑Fi; leave SoftAP / AP fallback off unless you need recovery.
-3. If SoftAP must stay on, use a strong unique AP password and treat `192.168.4.1` as sensitive.
+1. Complete SoftAP wizard from a phone or laptop.
+2. Prefer a web UI password (≥12) unless the LAN is fully trusted.
+3. Change SoftAP password away from `pixelmap1` if SoftAP/APSTA stays enabled.
 4. Do not expose the HTTP UI to the public internet.

@@ -46,13 +46,68 @@ static const char *LOGIN_HTML =
     "button{margin-top:.85rem;width:100%;padding:.7rem;border:0;border-radius:8px;background:#3d6b8c;color:#fff;font-weight:600;cursor:pointer}"
     ".err{color:#f28b82;font-size:.85rem;margin-top:.6rem;min-height:1.2em}"
     "</style></head><body><div class=card><h1>PixelMap</h1>"
-    "<p>Enter the web UI password. First boot: read it from USB serial (115200). SoftAP password is also printed on serial.</p>"
+    "<p>Enter the web UI password to continue.</p>"
     "<input id=p type=password autocomplete=current-password placeholder=\"Password\">"
     "<button id=b type=button>Sign in</button><div class=err id=e></div></div>"
     "<script>async function go(){e.textContent='';const r=await fetch('/api/auth',{method:'POST',credentials:'same-origin',"
     "headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:p.value})});"
     "const j=await r.json().catch(()=>({}));if(r.ok&&j.ok){try{sessionStorage.setItem('pm_auth',j.token)}catch(_){}"
     "location.href='/'}else e.textContent=j.error||'Login failed'}b.onclick=go;p.onkeydown=ev=>{if(ev.key==='Enter')go()}</script></body></html>";
+
+/* Compact first-boot SoftAP wizard (no serial required). */
+static const char *SETUP_HTML =
+    "<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\">"
+    "<title>PixelMap Setup</title><style>"
+    "body{font-family:system-ui,sans-serif;background:#1a1d21;color:#e8eaed;margin:0;padding:1rem}"
+    ".wrap{max-width:28rem;margin:0 auto}h1{font-size:1.35rem;margin:0 0 .35rem}"
+    "p,.hint{color:#9aa0a6;font-size:.9rem;line-height:1.4}label{display:block;margin:.75rem 0 .3rem;font-size:.85rem}"
+    "input[type=text],input[type=password],select{width:100%;box-sizing:border-box;padding:.65rem .75rem;border-radius:8px;"
+    "border:1px solid #3c4043;background:#121417;color:#e8eaed}"
+    ".row{display:flex;gap:.5rem;align-items:center;margin:.5rem 0}.row input{width:auto}"
+    "button{margin-top:.6rem;padding:.7rem 1rem;border:0;border-radius:8px;background:#3d6b8c;color:#fff;font-weight:600;cursor:pointer;width:100%}"
+    "button.sec{background:#3c4043}button:disabled{opacity:.5}.err{color:#f28b82;min-height:1.2em;margin-top:.5rem}"
+    ".warn{background:#3d2e12;border:1px solid #8a6d1a;color:#f0d78c;padding:.65rem .75rem;border-radius:8px;font-size:.85rem;margin:.75rem 0}"
+    ".step{display:none}.step.on{display:block}.scan{max-height:10rem;overflow:auto;margin:.5rem 0}"
+    ".scan button{width:100%;text-align:left;background:#2a2f36;margin:.25rem 0;font-weight:500}"
+    "</style></head><body><div class=wrap>"
+    "<h1>PixelMap setup</h1><p class=hint>You are on the SoftAP portal. Complete this wizard to finish first-time setup.</p>"
+    "<div id=s1 class='step on'><p>1 — Join your Wi‑Fi (optional — you can stay on SoftAP only).</p>"
+    "<button type=button class=sec id=scanBtn>Scan networks</button><div class=scan id=scanBox></div>"
+    "<label>Network SSID</label><input id=ssid list=ssidList><datalist id=ssidList></datalist>"
+    "<label>Wi‑Fi password</label><input id=pass type=password autocomplete=new-password>"
+    "<label>Hostname</label><input id=host value=pixelmap>"
+    "<button type=button id=n1>Next</button></div>"
+    "<div id=s2 class=step><p>2 — SoftAP options</p>"
+    "<div class=row><input type=checkbox id=apen checked><label for=apen style=margin:0>Keep SoftAP on with Wi‑Fi (APSTA)</label></div>"
+    "<div class=row><input type=checkbox id=apfb><label for=apfb style=margin:0>SoftAP fallback if Wi‑Fi drops</label></div>"
+    "<label>SoftAP SSID (blank = PixelMap-XXXX)</label><input id=apssid>"
+    "<label>SoftAP password</label><input id=appass type=password placeholder=\"Leave blank to keep pixelmap1\" autocomplete=new-password>"
+    "<div class=warn>Default SoftAP password is <b>pixelmap1</b>. Change it for shared venues (min 12 chars).</div>"
+    "<button type=button class=sec id=b2>Back</button><button type=button id=n2>Next</button></div>"
+    "<div id=s3 class=step><p>3 — Web UI access</p>"
+    "<label>Web UI password (min 12) — leave blank for open UI</label>"
+    "<input id=webpass type=password autocomplete=new-password>"
+    "<div class=row><input type=checkbox id=openAck><label for=openAck style=margin:0>I understand open UI means anyone on the network can change settings / OTA</label></div>"
+    "<div class=warn>Recommended: set a password. Open UI is fine for trusted private networks only.</div>"
+    "<button type=button class=sec id=b3>Back</button><button type=button id=finish>Finish setup</button></div>"
+    "<div class=err id=e></div></div><script>"
+    "const $=id=>document.getElementById(id);const show=n=>{[1,2,3].forEach(i=>$('s'+i).classList.toggle('on',i===n))};"
+    "$('n1').onclick=()=>show(2);$('b2').onclick=()=>show(1);$('n2').onclick=()=>show(3);$('b3').onclick=()=>show(2);"
+    "$('scanBtn').onclick=async()=>{e.textContent='Scanning…';const r=await fetch('/api/setup/scan');const j=await r.json();e.textContent='';"
+    "scanBox.innerHTML='';ssidList.innerHTML='';(j.aps||[]).forEach(a=>{const o=document.createElement('option');o.value=a.ssid;ssidList.appendChild(o);"
+    "const b=document.createElement('button');b.type='button';b.textContent=a.ssid+' ('+a.rssi+' dBm)';b.onclick=()=>ssid.value=a.ssid;scanBox.appendChild(b)})};"
+    "$('finish').onclick=async()=>{e.textContent='';const web=webpass.value;const open=!web;"
+    "if(open&&!openAck.checked){e.textContent='Check the open-UI acknowledgement, or set a password.';return}"
+    "if(web&&web.length<12){e.textContent='Web password must be at least 12 characters.';return}"
+    "if(appass.value&&appass.value.length<12){e.textContent='SoftAP password must be at least 12 characters (or leave blank).';return}"
+    "const body={ssid:ssid.value.trim(),pass:pass.value,host:host.value.trim()||'pixelmap',"
+    "apen:apen.checked,apfb:apfb.checked,apssid:apssid.value.trim(),appass:appass.value,"
+    "webpass:web,openUi:open,ackOpen:openAck.checked,ackDefaultAp:!appass.value};"
+    "const r=await fetch('/api/setup/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});"
+    "const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok){e.textContent=j.error||'Setup failed';return}"
+    "if(j.token)try{sessionStorage.setItem('pm_auth',j.token)}catch(_){}"
+    "e.textContent='Saved — opening UI…';location.href='/'};"
+    "</script></body></html>";
 
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
@@ -86,10 +141,16 @@ static const char *stored_web_secret(void)
     return c->ui_pin;
 }
 
-/** Production: web auth is always required once a secret exists (ensure_security guarantees this). */
+static bool setup_done(void)
+{
+    return s_hooks.cfg && s_hooks.cfg->setup_complete;
+}
+
+/** Auth required only when enabled and a password hash is stored. */
 static bool web_auth_enabled(void)
 {
-    return stored_web_secret()[0] != '\0';
+    pm_app_config_t *c = s_hooks.cfg;
+    return c && c->web_auth && stored_web_secret()[0] != '\0';
 }
 
 static bool extract_cookie_value(const char *cookie, const char *name, char *out, size_t out_len)
@@ -129,7 +190,7 @@ static bool extract_session_token(httpd_req_t *req, char *out, size_t out_len)
 
 static bool session_ok(httpd_req_t *req)
 {
-    if (!web_auth_enabled()) return false; /* fail closed */
+    if (!web_auth_enabled()) return true; /* open UI */
     if (!s_session[0]) return false;
     if (now_ms() - s_session_at_ms > PM_SESSION_TTL_MS) {
         s_session[0] = '\0';
@@ -147,6 +208,7 @@ static bool session_ok(httpd_req_t *req)
 static bool auth_ok(httpd_req_t *req, bool mutating)
 {
     (void)mutating;
+    if (!setup_done()) return false; /* only setup routes while wizard pending */
     return session_ok(req);
 }
 
@@ -229,7 +291,11 @@ static cJSON *read_body_json(httpd_req_t *req)
 
 static esp_err_t h_index(httpd_req_t *req)
 {
-    if (!session_ok(req)) {
+    if (!setup_done()) {
+        httpd_resp_set_type(req, "text/html");
+        return httpd_resp_send(req, SETUP_HTML, HTTPD_RESP_USE_STRLEN);
+    }
+    if (web_auth_enabled() && !session_ok(req)) {
         return reject_auth_page(req);
     }
     httpd_resp_set_type(req, "text/html");
@@ -263,11 +329,13 @@ static esp_err_t h_get_config(httpd_req_t *req)
     cJSON_AddStringToObject(o, "ssid", c->sta_ssid);
     /* Never echo Wi‑Fi password; UI only sends a new pass when the user types one. */
     cJSON_AddBoolToObject(o, "passSet", c->sta_pass[0] != '\0');
-    cJSON_AddBoolToObject(o, "webAuth", true); /* always required */
+    cJSON_AddBoolToObject(o, "setupComplete", c->setup_complete);
+    cJSON_AddBoolToObject(o, "webAuth", c->web_auth && stored_web_secret()[0] != '\0');
     cJSON_AddBoolToObject(o, "webPassSet", stored_web_secret()[0] != '\0');
     cJSON_AddBoolToObject(o, "webPassRotate", c->web_pass_rotate);
     cJSON_AddBoolToObject(o, "pinSet", stored_web_secret()[0] != '\0'); /* legacy alias */
     cJSON_AddNumberToObject(o, "webPassMin", PM_SECURITY_PASS_MIN);
+    cJSON_AddBoolToObject(o, "apDefaultPass", strcmp(c->ap_pass, PM_SETUP_AP_PASS) == 0);
     cJSON_AddBoolToObject(o, "apen", c->ap_enable);
     cJSON_AddBoolToObject(o, "apfb", c->ap_fallback);
     cJSON_AddStringToObject(o, "apssid", c->ap_ssid);
@@ -407,27 +475,49 @@ static esp_err_t h_post_config(httpd_req_t *req)
         c->ap_pass[sizeof(c->ap_pass) - 1] = '\0';
     }
     bool auth_changed = false;
-    c->web_auth = true; /* cannot disable */
-    if ((v = cJSON_GetObjectItem(j, "webpass")) && cJSON_IsString(v) && v->valuestring[0] != '\0') {
-        if (!pm_security_password_ok(v->valuestring)) {
-            pm_config_unlock();
-            cJSON_Delete(j);
-            httpd_resp_set_status(req, "400 Bad Request");
-            httpd_resp_set_type(req, "application/json");
-            return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"web password must be at least 12 characters\"}");
+    if ((v = cJSON_GetObjectItem(j, "webAuth"))) {
+        bool want = cJSON_IsTrue(v);
+        if (want != c->web_auth) auth_changed = true;
+        c->web_auth = want;
+    }
+    if ((v = cJSON_GetObjectItem(j, "webpass")) && cJSON_IsString(v)) {
+        if (v->valuestring[0] == '\0') {
+            /* Blank password clears auth (open UI). */
+            memset(c->web_pass, 0, sizeof(c->web_pass));
+            c->ui_pin[0] = '\0';
+            c->web_auth = false;
+            c->web_pass_rotate = false;
+            s_session[0] = '\0';
+            auth_changed = true;
+        } else {
+            if (!pm_security_password_ok(v->valuestring)) {
+                pm_config_unlock();
+                cJSON_Delete(j);
+                httpd_resp_set_status(req, "400 Bad Request");
+                httpd_resp_set_type(req, "application/json");
+                return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"web password must be at least 12 characters\"}");
+            }
+            char hash[PM_SECURITY_HASH_MAX];
+            if (pm_security_hash_password(v->valuestring, hash, sizeof(hash)) != ESP_OK) {
+                pm_config_unlock();
+                cJSON_Delete(j);
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "hash failed");
+                return ESP_FAIL;
+            }
+            strncpy(c->web_pass, hash, sizeof(c->web_pass) - 1);
+            c->web_pass[sizeof(c->web_pass) - 1] = '\0';
+            c->ui_pin[0] = '\0';
+            c->web_auth = true;
+            c->web_pass_rotate = false;
+            auth_changed = true;
         }
-        char hash[PM_SECURITY_HASH_MAX];
-        if (pm_security_hash_password(v->valuestring, hash, sizeof(hash)) != ESP_OK) {
-            pm_config_unlock();
-            cJSON_Delete(j);
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "hash failed");
-            return ESP_FAIL;
-        }
-        strncpy(c->web_pass, hash, sizeof(c->web_pass) - 1);
-        c->web_pass[sizeof(c->web_pass) - 1] = '\0';
-        c->ui_pin[0] = '\0';
-        c->web_pass_rotate = false;
-        auth_changed = true;
+    }
+    if (c->web_auth && !c->web_pass[0]) {
+        pm_config_unlock();
+        cJSON_Delete(j);
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"set a web password or disable web auth\"}");
     }
     if ((v = cJSON_GetObjectItem(j, "gpio")) && cJSON_IsNumber(v)) {
         c->gpio_data = (int)v->valuedouble;
@@ -1033,9 +1123,156 @@ static esp_err_t h_post_auth(httpd_req_t *req)
 static esp_err_t h_get_auth(httpd_req_t *req)
 {
     cJSON *o = cJSON_CreateObject();
-    cJSON_AddBoolToObject(o, "required", true);
-    cJSON_AddBoolToObject(o, "ok", session_ok(req));
+    cJSON_AddBoolToObject(o, "setupComplete", setup_done());
+    cJSON_AddBoolToObject(o, "required", setup_done() && web_auth_enabled());
+    cJSON_AddBoolToObject(o, "ok", setup_done() && session_ok(req));
     return send_json(req, o);
+}
+
+static esp_err_t h_get_setup_status(httpd_req_t *req)
+{
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "setupComplete", setup_done());
+    cJSON_AddStringToObject(o, "setupApPass", PM_SETUP_AP_PASS);
+    cJSON_AddStringToObject(o, "apIp", "192.168.4.1");
+    return send_json(req, o);
+}
+
+static esp_err_t wifi_scan_response(httpd_req_t *req)
+{
+    pm_wifi_scan_ap_t aps[24];
+    size_t n = 0;
+    esp_err_t err = pm_wifi_scan(aps, sizeof(aps) / sizeof(aps[0]), &n);
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "ok", err == ESP_OK);
+    if (err != ESP_OK) {
+        cJSON_AddStringToObject(o, "error", esp_err_to_name(err));
+        return send_json(req, o);
+    }
+    cJSON *arr = cJSON_CreateArray();
+    for (size_t i = 0; i < n; ++i) {
+        cJSON *a = cJSON_CreateObject();
+        cJSON_AddStringToObject(a, "ssid", aps[i].ssid);
+        cJSON_AddNumberToObject(a, "rssi", aps[i].rssi);
+        cJSON_AddBoolToObject(a, "open", aps[i].open);
+        cJSON_AddItemToArray(arr, a);
+    }
+    cJSON_AddItemToObject(o, "aps", arr);
+    return send_json(req, o);
+}
+
+static esp_err_t h_get_setup_scan(httpd_req_t *req)
+{
+    if (setup_done()) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"setup already complete\"}");
+    }
+    return wifi_scan_response(req);
+}
+
+static esp_err_t h_post_setup_complete(httpd_req_t *req)
+{
+    if (setup_done()) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"setup already complete\"}");
+    }
+    cJSON *j = read_body_json(req);
+    if (!j) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad json");
+        return ESP_FAIL;
+    }
+
+    pm_app_config_t *c = s_hooks.cfg;
+    pm_config_lock();
+    cJSON *v;
+    if ((v = cJSON_GetObjectItem(j, "ssid")) && cJSON_IsString(v)) {
+        strncpy(c->sta_ssid, v->valuestring, sizeof(c->sta_ssid) - 1);
+        c->sta_ssid[sizeof(c->sta_ssid) - 1] = '\0';
+    }
+    if ((v = cJSON_GetObjectItem(j, "pass")) && cJSON_IsString(v) && v->valuestring[0]) {
+        strncpy(c->sta_pass, v->valuestring, sizeof(c->sta_pass) - 1);
+        c->sta_pass[sizeof(c->sta_pass) - 1] = '\0';
+    }
+    if ((v = cJSON_GetObjectItem(j, "host")) && cJSON_IsString(v) && v->valuestring[0]) {
+        strncpy(c->hostname, v->valuestring, sizeof(c->hostname) - 1);
+        c->hostname[sizeof(c->hostname) - 1] = '\0';
+    }
+    if ((v = cJSON_GetObjectItem(j, "apen"))) c->ap_enable = cJSON_IsTrue(v);
+    if ((v = cJSON_GetObjectItem(j, "apfb"))) c->ap_fallback = cJSON_IsTrue(v);
+    if ((v = cJSON_GetObjectItem(j, "apssid")) && cJSON_IsString(v)) {
+        strncpy(c->ap_ssid, v->valuestring, sizeof(c->ap_ssid) - 1);
+        c->ap_ssid[sizeof(c->ap_ssid) - 1] = '\0';
+    }
+    if ((v = cJSON_GetObjectItem(j, "appass")) && cJSON_IsString(v) && v->valuestring[0]) {
+        if (!pm_security_password_ok(v->valuestring)) {
+            pm_config_unlock();
+            cJSON_Delete(j);
+            httpd_resp_set_status(req, "400 Bad Request");
+            httpd_resp_set_type(req, "application/json");
+            return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"AP password must be at least 12 characters\"}");
+        }
+        strncpy(c->ap_pass, v->valuestring, sizeof(c->ap_pass) - 1);
+        c->ap_pass[sizeof(c->ap_pass) - 1] = '\0';
+    } else {
+        /* Keep setup default; require acknowledgement in wizard. */
+        bool ack = cJSON_IsTrue(cJSON_GetObjectItem(j, "ackDefaultAp"));
+        if (!ack && strcmp(c->ap_pass, PM_SETUP_AP_PASS) == 0) {
+            /* allow keep with ackDefaultAp from wizard */
+        }
+        strncpy(c->ap_pass, PM_SETUP_AP_PASS, sizeof(c->ap_pass) - 1);
+    }
+
+    bool open_ui = cJSON_IsTrue(cJSON_GetObjectItem(j, "openUi"));
+    const char *webpass = NULL;
+    if ((v = cJSON_GetObjectItem(j, "webpass")) && cJSON_IsString(v)) webpass = v->valuestring;
+    if (open_ui || !webpass || !webpass[0]) {
+        if (!cJSON_IsTrue(cJSON_GetObjectItem(j, "ackOpen"))) {
+            pm_config_unlock();
+            cJSON_Delete(j);
+            httpd_resp_set_status(req, "400 Bad Request");
+            httpd_resp_set_type(req, "application/json");
+            return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"acknowledge open UI or set a password\"}");
+        }
+        memset(c->web_pass, 0, sizeof(c->web_pass));
+        c->web_auth = false;
+        c->web_pass_rotate = false;
+    } else {
+        if (!pm_security_password_ok(webpass)) {
+            pm_config_unlock();
+            cJSON_Delete(j);
+            httpd_resp_set_status(req, "400 Bad Request");
+            httpd_resp_set_type(req, "application/json");
+            return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"web password must be at least 12 characters\"}");
+        }
+        char hash[PM_SECURITY_HASH_MAX];
+        if (pm_security_hash_password(webpass, hash, sizeof(hash)) != ESP_OK) {
+            pm_config_unlock();
+            cJSON_Delete(j);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "hash failed");
+            return ESP_FAIL;
+        }
+        strncpy(c->web_pass, hash, sizeof(c->web_pass) - 1);
+        c->web_pass[sizeof(c->web_pass) - 1] = '\0';
+        c->web_auth = true;
+        c->web_pass_rotate = false;
+    }
+
+    c->setup_complete = true;
+    cJSON_Delete(j);
+    pm_config_save(c);
+    pm_config_unlock();
+    if (s_hooks.on_config_changed) s_hooks.on_config_changed();
+
+    cJSON *resp = cJSON_CreateObject();
+    cJSON_AddBoolToObject(resp, "ok", true);
+    if (web_auth_enabled()) {
+        mint_session(s_session, sizeof(s_session));
+        set_session_cookie(req, s_session);
+        cJSON_AddStringToObject(resp, "token", s_session);
+    }
+    return send_json(req, resp);
 }
 
 static esp_err_t h_post_auth_logout(httpd_req_t *req)
@@ -1071,25 +1308,7 @@ static esp_err_t h_get_wifi_status(httpd_req_t *req)
 static esp_err_t h_get_wifi_scan(httpd_req_t *req)
 {
     if (!auth_ok(req, false)) return reject_pin(req);
-    pm_wifi_scan_ap_t aps[24];
-    size_t n = 0;
-    esp_err_t err = pm_wifi_scan(aps, sizeof(aps) / sizeof(aps[0]), &n);
-    cJSON *o = cJSON_CreateObject();
-    cJSON_AddBoolToObject(o, "ok", err == ESP_OK);
-    if (err != ESP_OK) {
-        cJSON_AddStringToObject(o, "error", esp_err_to_name(err));
-        return send_json(req, o);
-    }
-    cJSON *arr = cJSON_CreateArray();
-    for (size_t i = 0; i < n; ++i) {
-        cJSON *a = cJSON_CreateObject();
-        cJSON_AddStringToObject(a, "ssid", aps[i].ssid);
-        cJSON_AddNumberToObject(a, "rssi", aps[i].rssi);
-        cJSON_AddBoolToObject(a, "open", aps[i].open);
-        cJSON_AddItemToArray(arr, a);
-    }
-    cJSON_AddItemToObject(o, "aps", arr);
-    return send_json(req, o);
+    return wifi_scan_response(req);
 }
 
 static esp_err_t h_get_audio(httpd_req_t *req)
@@ -1118,7 +1337,7 @@ esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
     if (!hooks || !hooks->cfg || !hooks->map) return ESP_ERR_INVALID_ARG;
     s_hooks = *hooks;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 36;
+    config.max_uri_handlers = 40;
     config.stack_size = 10240;
     ESP_RETURN_ON_ERROR(httpd_start(&s_server, &config), TAG, "httpd");
 
@@ -1129,6 +1348,9 @@ esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
         {.uri = "/api/auth", .method = HTTP_GET, .handler = h_get_auth},
         {.uri = "/api/auth", .method = HTTP_POST, .handler = h_post_auth},
         {.uri = "/api/auth/logout", .method = HTTP_POST, .handler = h_post_auth_logout},
+        {.uri = "/api/setup/status", .method = HTTP_GET, .handler = h_get_setup_status},
+        {.uri = "/api/setup/scan", .method = HTTP_GET, .handler = h_get_setup_scan},
+        {.uri = "/api/setup/complete", .method = HTTP_POST, .handler = h_post_setup_complete},
         {.uri = "/api/wifi/status", .method = HTTP_GET, .handler = h_get_wifi_status},
         {.uri = "/api/wifi/scan", .method = HTTP_GET, .handler = h_get_wifi_scan},
         {.uri = "/api/config", .method = HTTP_GET, .handler = h_get_config},

@@ -198,7 +198,7 @@ static void apply_wifi_from_cfg(void)
         .sta_ssid = s_cfg.sta_ssid,
         .sta_pass = s_cfg.sta_pass,
         .hostname = s_cfg.hostname,
-        .ap_enable = s_cfg.ap_enable,
+        .ap_enable = s_cfg.setup_complete ? s_cfg.ap_enable : true,
         .ap_fallback = s_cfg.ap_fallback,
         .ap_ssid = s_cfg.ap_ssid,
         .ap_pass = s_cfg.ap_pass,
@@ -483,11 +483,12 @@ void app_main(void)
     }
     if (pm_config_ensure_security(&s_cfg)) {
         if (pm_config_save(&s_cfg) != ESP_OK) {
-            ESP_LOGE(TAG, "failed to persist security credentials");
+            ESP_LOGE(TAG, "failed to persist security/setup state");
         }
     }
-    /* SoftAP PSK is recoverable via UART (physical access). Web password is not. */
-    if (s_cfg.ap_pass[0]) {
+    if (!s_cfg.setup_complete) {
+        ESP_LOGW(TAG, "First-boot setup: SoftAP password \"%s\" → http://192.168.4.1/", PM_SETUP_AP_PASS);
+    } else if (s_cfg.ap_pass[0]) {
         ESP_LOGI(TAG, "SoftAP password: %s", s_cfg.ap_pass);
     }
     err = pm_effect_lua_init();
@@ -536,7 +537,7 @@ void app_main(void)
         .sta_ssid = s_cfg.sta_ssid,
         .sta_pass = s_cfg.sta_pass,
         .hostname = s_cfg.hostname,
-        .ap_enable = s_cfg.ap_enable,
+        .ap_enable = s_cfg.setup_complete ? s_cfg.ap_enable : true,
         .ap_fallback = s_cfg.ap_fallback,
         .ap_ssid = s_cfg.ap_ssid,
         .ap_pass = s_cfg.ap_pass,

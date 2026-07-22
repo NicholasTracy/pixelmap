@@ -135,24 +135,23 @@ Use the matching `esp32s3` filenames for S3 boards. On some S3 modules the bootl
 
 </details>
 
-### 4) Connect to PixelMap Wi‑Fi
+### 4) Connect to PixelMap Wi‑Fi (setup wizard)
 
-After a successful flash:
+After a successful flash — **no USB serial required**:
 
-1. Connect USB serial at **115200** baud and note the **SoftAP password** and **Web UI password** (printed once on first boot; SoftAP password is also logged each boot)
-2. On your phone or computer, join the Wi‑Fi network named like **`PixelMap-XXXX`** using that SoftAP password
-3. Open **[http://192.168.4.1](http://192.168.4.1)** and sign in with the web UI password
-4. Change the web UI password under Network (required if the yellow “bootstrap” banner is shown)
+1. On your phone or computer, join **`PixelMap-XXXX`**
+2. Password: **`pixelmap1`**
+3. Open **[http://192.168.4.1](http://192.168.4.1)** — the first-boot setup wizard opens
+4. Pick your venue Wi‑Fi (optional), SoftAP options (APSTA is on by default), and either set a web UI password or leave the UI open (with a warning)
+5. Finish setup — the full PixelMap UI loads
 
-From that page you can:
+After setup you can:
 
-- Scan and connect the controller to your home/show Wi‑Fi
-- Set LED chip type and pixel count
-- Build or drag-edit your pixel map
-- Pick a spatial effect
-- Turn on Art-Net / sACN and set universes
+- Refine LED chip type, pixel count, and maps
+- Pick spatial effects
+- Turn on Art-Net / sACN
 
-When the controller joins your normal Wi‑Fi, SoftAP turns off by default (unless you enable APSTA / AP fallback). Use the LAN IP or `hostname.local` instead of `192.168.4.1`.
+If SoftAP is not kept on (APSTA / fallback), use the LAN IP or `hostname.local` once the controller joins your Wi‑Fi.
 
 ---
 
@@ -305,24 +304,18 @@ APA102 / SK9822 use SPI (data + clock GPIO; one strip on SPI2). Color handling i
 
 ## Wi‑Fi, SoftAP, OTA, and security
 
-On first boot (or after factory reset), PixelMap generates **unique** SoftAP and web UI passwords and prints them on USB serial (115200). SoftAP starts when no STA network is configured:
+First boot / factory reset opens a **SoftAP setup wizard** (no serial):
 
 | | |
 |--|--|
-| SSID | `PixelMap-XXXX` (last bytes of MAC), or a custom AP SSID |
-| SoftAP password | Unique per device (min 12 if you change it); never a shared default |
-| Web UI | Login always required; password stored as salted hash |
-| UI URL | `http://192.168.4.1/` (cleartext HTTP — treat SoftAP setup as physically trusted) |
+| SSID | `PixelMap-XXXX` |
+| SoftAP password | `pixelmap1` during setup (change afterward for shared venues) |
+| Wizard | `http://192.168.4.1/` — Wi‑Fi, APSTA, web password or open UI |
+| After setup | Full UI; web auth optional; SoftAP/APSTA as you chose |
 
-In the **Network** tab you can:
+In the **Network** tab you can scan for Wi‑Fi, toggle APSTA / AP fallback, change SoftAP password (min 12), and enable/disable web UI login (blank password + confirm → open UI).
 
-- **Scan** for nearby Wi‑Fi networks and join as a client (STA)
-- Optionally keep SoftAP on with STA (**APSTA**), or enable **AP fallback** if STA drops (both off by default once you are on a LAN)
-- Change SoftAP / web passwords (min 12 characters)
-
-**Web OTA:** Network → Firmware update. Upload the release **app** image (`pixelmap-esp32.bin` / `pixelmap-esp32s3.bin`), not the merged full-flash file. Requires login. OTA verifies image format via ESP-IDF; production SKUs should also enable Secure Boot + signed apps + flash encryption (see `docs/SECURITY.md`).
-
-**Transport:** The UI is HTTP (not HTTPS). On a hostile LAN, prefer SoftAP-only setup or isolate the device. Session cookies are `HttpOnly` + `SameSite=Lax` with an 8-hour idle timeout; login is rate-limited.
+**Web OTA:** Network → Firmware update with the **app** `.bin` (not the merged image). Requires login when web auth is on. See [docs/SECURITY.md](docs/SECURITY.md).
 
 ---
 
