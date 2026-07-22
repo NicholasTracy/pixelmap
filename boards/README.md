@@ -1,9 +1,9 @@
-# Board presets
+# Board pin notes
 
-JSON pin maps aligned with common WLED ESP32 layouts. These files are **reference documentation** for now — the firmware does not import them automatically, and the web UI does not yet have a board-preset picker.
+These JSON files describe common WLED-style ESP32 pin layouts. They’re **reference only** — PixelMap does not load them automatically yet. Enter the same pins in the **Strip** tab of the web UI.
 
-| File | Description |
+| File | Typical use |
 |------|-------------|
-| `wled_esp32_default.json` | Data on GPIO 16, status LED on GPIO 2, clock GPIO 14 |
+| `wled_esp32_default.json` | Data on GPIO **16**, status LED on GPIO **2**, clock on GPIO **14** |
 
-Enter matching GPIO / chipset values manually on the **Strip** and **Network** tabs. A future release may seed NVS or offer an import button.
+If your board uses different pins, set them in the UI to match your wiring.

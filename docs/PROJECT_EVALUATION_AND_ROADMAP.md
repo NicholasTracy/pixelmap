@@ -1,5 +1,8 @@
 # PixelMap — Project Evaluation & Roadmap
 
+**Audience:** maintainers and coding agents — **not** end-user documentation.  
+For install and usage, see the [README](../README.md).
+
 **Status:** Living document for agents and maintainers  
 **Evaluated:** 2026-07-21 (updated — Phase 3 product features landed)  
 **Version at evaluation:** `0.1.0` (`VERSION`)  

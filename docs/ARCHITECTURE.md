@@ -1,7 +1,6 @@
-# PixelMap Architecture
+# PixelMap architecture (developers)
 
-For project health, defects, missing features, and the phased roadmap, see
-[PROJECT_EVALUATION_AND_ROADMAP.md](./PROJECT_EVALUATION_AND_ROADMAP.md).
+This page describes how the firmware is structured. For install and day-to-day use, see the [README](../README.md). For project status and roadmap (maintainers), see [PROJECT_EVALUATION_AND_ROADMAP.md](./PROJECT_EVALUATION_AND_ROADMAP.md).
 
 ## Render path
 

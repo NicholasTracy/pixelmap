@@ -1,41 +1,47 @@
-# PixelMap security model
+# Security tips (for installers)
 
-## First-boot SoftAP wizard (no USB serial)
+PixelMap is meant to be easy to set up from a phone. That means the first Wi‑Fi hotspot uses a **known password**. After setup, you choose how locked-down the web page should be.
 
-On first flash or after factory reset (`setup_complete = false`):
+## First connection
 
-1. Join Wi‑Fi **`PixelMap-XXXX`** with password **`pixelmap1`**
-2. Open **http://192.168.4.1/** — a walled setup wizard is served (main UI/API blocked)
-3. Choose venue Wi‑Fi (optional), SoftAP options (**APSTA** default on), and web UI password
-4. Leave web password blank + acknowledge → **open UI** (warned)
-5. Finish → normal UI; SoftAP password remains `pixelmap1` unless you changed it
+| | |
+|--|--|
+| Network name | `PixelMap-XXXX` (letters/numbers at the end vary by device) |
+| Hotspot password | `pixelmap1` |
+| Address | http://192.168.4.1 |
 
-## Defaults after setup
+Only use that hotspot while you’re setting the device up, or when you intentionally keep it on. On a busy venue Wi‑Fi, change the hotspot password afterward.
 
-| Control | Behavior |
-|---------|----------|
-| Web UI auth | Optional — set a password (≥12) or leave open with acknowledgement |
-| SoftAP password | Setup default `pixelmap1` until changed (min 12 when changing) |
-| SoftAP + STA | APSTA selectable in wizard (default on); SoftAP drops when STA healthy if APSTA off |
-| AP fallback | Off by default; opt-in in wizard / Network tab |
-| Sessions | When auth on: 128-bit token, `HttpOnly` + `SameSite=Lax`, 8 h idle TTL |
-| Login | Rate-limited (5 failures → 60 s lockout) |
-| Factory reset | Session + re-entered password (if auth on); returns to SoftAP wizard |
+## Web page password
 
-## Disabling web auth later
+During setup (or later under **Network**) you can:
 
-Network → uncheck **Require password**, leave password blank, confirm the warning. Clears the stored hash.
+- **Set a password** (at least 12 characters) — recommended if other people share the network  
+- **Leave the UI open** — fine for a private home or locked-down show network; anyone who can open the page can change settings and upload firmware  
 
-## Threat model
+You can turn the web password on or off later. Turning it off asks for a confirmation.
 
-- **Setup SoftAP** uses a **known** password (`pixelmap1`) so phones can onboard without serial. Treat first-boot SoftAP as physically trusted / short-lived.
-- After setup, change SoftAP and enable web auth on any shared or hostile network.
-- UI remains **HTTP** (not HTTPS). Prefer isolating controllers on a show VLAN for venues.
-- Stock builds do not enable Secure Boot / flash encryption / signed OTA — see ESP-IDF for commercial SKUs.
+## Hotspot after setup
 
-## Operator checklist
+- **Off while on home/venue Wi‑Fi** — normal if you only use the LAN address or `pixelmap.local`
+- **Stay on with home Wi‑Fi** — useful so a phone can always reach `192.168.4.1` without knowing the venue password
+- **Come back if Wi‑Fi drops** — optional recovery hotspot
 
-1. Complete SoftAP wizard from a phone or laptop.
-2. Prefer a web UI password (≥12) unless the LAN is fully trusted.
-3. Change SoftAP password away from `pixelmap1` if SoftAP/APSTA stays enabled.
-4. Do not expose the HTTP UI to the public internet.
+If you leave the hotspot on in public, change its password away from `pixelmap1`.
+
+## Firmware updates
+
+Use **Network → Firmware update** and upload the app file from a release (`pixelmap-esp32.bin` or `pixelmap-esp32s3.bin`), not the big “merged” install file. If a web password is set, you must be signed in first.
+
+## Factory reset
+
+Erases settings and maps, then shows the first-time setup wizard again (hotspot password back to `pixelmap1`). If a web password is set, you’ll need to enter it to confirm.
+
+## Simple rules of thumb
+
+1. Finish the setup wizard, then change default passwords if the device isn’t on a trusted network.  
+2. Prefer a web password anywhere guests or other gear share Wi‑Fi.  
+3. Don’t put the control page on the open internet.  
+4. Treat the first-setup hotspot as temporary and local.
+
+Commercial / locked-down hardware builds can add stronger options (encrypted storage, signed updates, HTTPS). Those are optional manufacturing choices, not required for normal DIY use.
