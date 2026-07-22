@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/NicholasTracy/pixelmap/actions/workflows/ci.yml/badge.svg)](https://github.com/NicholasTracy/pixelmap/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/github/v/release/NicholasTracy/pixelmap?include_prereleases&sort=semver&label=version)](https://github.com/NicholasTracy/pixelmap/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
 PixelMap turns an ESP32 LED controller into a **spatial** light engine — patterns follow where your LEDs sit in space, not only their order on the strip.
 
@@ -195,4 +195,8 @@ Internals: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Roadmap notes: [docs/PR
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+PixelMap is **[GNU GPL v3](LICENSE)** (or later).
+
+That is a *copyleft* license: you can use, modify, and share the project, but if you distribute PixelMap or a modified version (including firmware binaries), you must also provide the corresponding source under GPL terms. Closed-source forks are not allowed.
+
+Bundled third-party pieces keep their own licenses where noted (for example Lua is MIT, which is compatible with GPL).
