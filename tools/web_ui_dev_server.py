@@ -18,7 +18,7 @@ HOST = "127.0.0.1"
 PORT = 8080
 
 CONFIG = {
-    "ver": "0.1.0",
+    "ver": "0.1.1",
     "ssid": "StudioWiFi",
     "pass": "dev-secret",
     "host": "pixelmap-dev",
