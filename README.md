@@ -1,8 +1,14 @@
-# PixelMap
+<p align="center">
+  <img src="docs/PixelMapLogo.svg" alt="PixelMap" width="200" />
+</p>
 
-[![CI](https://github.com/NicholasTracy/pixelmap/actions/workflows/ci.yml/badge.svg)](https://github.com/NicholasTracy/pixelmap/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/github/v/release/NicholasTracy/pixelmap?include_prereleases&sort=semver&label=version)](https://github.com/NicholasTracy/pixelmap/releases/latest)
-[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+<h1 align="center">PixelMap</h1>
+
+<p align="center">
+  <a href="https://github.com/NicholasTracy/pixelmap/actions/workflows/ci.yml"><img src="https://github.com/NicholasTracy/pixelmap/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/NicholasTracy/pixelmap/releases/latest"><img src="https://img.shields.io/github/v/release/NicholasTracy/pixelmap?include_prereleases&sort=semver&label=version" alt="Version" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-blue.svg" alt="License: GPL v3" /></a>
+</p>
 
 PixelMap turns an ESP32 LED controller into a **spatial** light engine — patterns follow where your LEDs sit in space, not only their order on the strip.
 

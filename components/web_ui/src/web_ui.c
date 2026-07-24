@@ -38,14 +38,15 @@ static int64_t s_auth_lock_until_ms;
 
 static const char *LOGIN_HTML =
     "<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\">"
-    "<title>PixelMap Login</title><style>"
+    "<title>PixelMap Login</title><link rel=icon href=/logo.svg type=image/svg+xml><style>"
     "body{font-family:system-ui,sans-serif;background:#1a1d21;color:#e8eaed;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}"
     ".card{background:#23272c;padding:1.5rem;border-radius:12px;width:min(22rem,92vw)}"
-    "h1{font-size:1.25rem;margin:0 0 .5rem}p{color:#9aa0a6;font-size:.9rem;margin:0 0 1rem}"
+    ".brand{display:flex;align-items:center;gap:.65rem;margin:0 0 .5rem}"
+    ".brand img{width:2.5rem;height:2.5rem}h1{font-size:1.25rem;margin:0}p{color:#9aa0a6;font-size:.9rem;margin:0 0 1rem}"
     "input{width:100%;box-sizing:border-box;padding:.65rem .75rem;border-radius:8px;border:1px solid #3c4043;background:#121417;color:#e8eaed}"
     "button{margin-top:.85rem;width:100%;padding:.7rem;border:0;border-radius:8px;background:#3d6b8c;color:#fff;font-weight:600;cursor:pointer}"
     ".err{color:#f28b82;font-size:.85rem;margin-top:.6rem;min-height:1.2em}"
-    "</style></head><body><div class=card><h1>PixelMap</h1>"
+    "</style></head><body><div class=card><div class=brand><img src=/logo.svg alt=\"\"><h1>PixelMap</h1></div>"
     "<p>Enter the web UI password to continue.</p>"
     "<input id=p type=password autocomplete=current-password placeholder=\"Password\">"
     "<button id=b type=button>Sign in</button><div class=err id=e></div></div>"
@@ -57,9 +58,10 @@ static const char *LOGIN_HTML =
 /* Compact first-boot SoftAP wizard (no serial required). */
 static const char *SETUP_HTML =
     "<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\">"
-    "<title>PixelMap Setup</title><style>"
+    "<title>PixelMap Setup</title><link rel=icon href=/logo.svg type=image/svg+xml><style>"
     "body{font-family:system-ui,sans-serif;background:#1a1d21;color:#e8eaed;margin:0;padding:1rem}"
-    ".wrap{max-width:28rem;margin:0 auto}h1{font-size:1.35rem;margin:0 0 .35rem}"
+    ".wrap{max-width:28rem;margin:0 auto}.brand{display:flex;align-items:center;gap:.65rem;margin:0 0 .35rem}"
+    ".brand img{width:2.5rem;height:2.5rem}h1{font-size:1.35rem;margin:0}"
     "p,.hint{color:#9aa0a6;font-size:.9rem;line-height:1.4}label{display:block;margin:.75rem 0 .3rem;font-size:.85rem}"
     "input[type=text],input[type=password],select{width:100%;box-sizing:border-box;padding:.65rem .75rem;border-radius:8px;"
     "border:1px solid #3c4043;background:#121417;color:#e8eaed}"
@@ -70,7 +72,8 @@ static const char *SETUP_HTML =
     ".step{display:none}.step.on{display:block}.scan{max-height:10rem;overflow:auto;margin:.5rem 0}"
     ".scan button{width:100%;text-align:left;background:#2a2f36;margin:.25rem 0;font-weight:500}"
     "</style></head><body><div class=wrap>"
-    "<h1>PixelMap setup</h1><p class=hint>You are on the SoftAP portal. Complete this wizard to finish first-time setup.</p>"
+    "<div class=brand><img src=/logo.svg alt=\"\"><h1>PixelMap setup</h1></div>"
+    "<p class=hint>You are on the SoftAP portal. Complete this wizard to finish first-time setup.</p>"
     "<div id=s1 class='step on'><p>1 — Join your Wi‑Fi (optional — you can stay on SoftAP only).</p>"
     "<button type=button class=sec id=scanBtn>Scan networks</button><div class=scan id=scanBox></div>"
     "<label>Network SSID</label><input id=ssid list=ssidList><datalist id=ssidList></datalist>"
@@ -116,6 +119,8 @@ extern const uint8_t bootstrap_css_start[] asm("_binary_bootstrap_min_css_start"
 extern const uint8_t bootstrap_css_end[] asm("_binary_bootstrap_min_css_end");
 extern const uint8_t bootstrap_js_start[] asm("_binary_bootstrap_bundle_min_js_start");
 extern const uint8_t bootstrap_js_end[] asm("_binary_bootstrap_bundle_min_js_end");
+extern const uint8_t pixelmap_logo_svg_start[] asm("_binary_PixelMapLogo_svg_start");
+extern const uint8_t pixelmap_logo_svg_end[] asm("_binary_PixelMapLogo_svg_end");
 
 static esp_err_t send_json(httpd_req_t *req, cJSON *obj)
 {
@@ -317,6 +322,14 @@ static esp_err_t h_bootstrap_js(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=86400");
     return httpd_resp_send(req, (const char *)bootstrap_js_start,
                            bootstrap_js_end - bootstrap_js_start);
+}
+
+static esp_err_t h_logo_svg(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "image/svg+xml");
+    httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=86400");
+    return httpd_resp_send(req, (const char *)pixelmap_logo_svg_start,
+                           pixelmap_logo_svg_end - pixelmap_logo_svg_start);
 }
 
 static esp_err_t h_get_config(httpd_req_t *req)
@@ -1343,6 +1356,7 @@ esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
 
     const httpd_uri_t routes[] = {
         {.uri = "/", .method = HTTP_GET, .handler = h_index},
+        {.uri = "/logo.svg", .method = HTTP_GET, .handler = h_logo_svg},
         {.uri = "/vendor/bootstrap.min.css", .method = HTTP_GET, .handler = h_bootstrap_css},
         {.uri = "/vendor/bootstrap.bundle.min.js", .method = HTTP_GET, .handler = h_bootstrap_js},
         {.uri = "/api/auth", .method = HTTP_GET, .handler = h_get_auth},
