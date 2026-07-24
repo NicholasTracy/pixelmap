@@ -193,6 +193,12 @@ Internals: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Roadmap notes: [docs/PR
 
 ---
 
+## A note about AI usage in this project
+
+PixelMap has made use of AI assistance tools such as Cursor Agents to assist with debugging, repository automation and maintenance, and setup of CI and other automation. That being said, the vast majority of the code base has been developed by a human with the assistance of code completion tools and questions asked on google, reddit, Stack Exchange, ChatGPT and more. AI is a tool, not a crutch, this project was developed with passion and love and would not be possible without the help of AI to make it fully functional and available on Github for free... This project is GPL v3 Open Source and I take not money from developing or releasing this. 
+
+---
+
 ## License
 
 PixelMap is **[GNU GPL v3](LICENSE)** (or later).
