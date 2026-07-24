@@ -9,7 +9,8 @@ idf_component_register(
         "index.html"
         "vendor/bootstrap.min.css"
         "vendor/bootstrap.bundle.min.js"
-        "../../docs/PixelMapLogo.svg"
+    EMBED_FILES
+        "../../docs/PixelMapLogo.png"
 )
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE PIXELMAP_VERSION=\"${PIXELMAP_VERSION_STR}\")

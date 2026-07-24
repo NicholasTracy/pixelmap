@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 UI_DIR = ROOT / "components" / "web_ui"
 INDEX = UI_DIR / "index.html"
-LOGO = ROOT / "docs" / "PixelMapLogo.svg"
+LOGO = ROOT / "docs" / "PixelMapLogo.png"
 
 HOST = "127.0.0.1"
 PORT = 8080
@@ -585,8 +585,8 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html"):
             self._send(200, INDEX.read_bytes(), "text/html; charset=utf-8")
             return
-        if path == "/logo.svg":
-            self._send(200, LOGO.read_bytes(), "image/svg+xml")
+        if path == "/logo.png":
+            self._send(200, LOGO.read_bytes(), "image/png")
             return
         if path == "/api/config":
             pub = dict(CONFIG)
