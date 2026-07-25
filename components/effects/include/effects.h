@@ -17,7 +17,7 @@ typedef enum {
     PM_EFFECT_NOISE_FIELD,
     PM_EFFECT_RADIAL_WAVE,
     PM_EFFECT_PLANE_SWEEP,
-    PM_EFFECT_POV_IMAGE_PLANE, /* spatial pattern stable in the swept POV plane */
+    PM_EFFECT_POV_IMAGE_PLANE, /* uploaded image/GIF/video frames mapped onto LEDs */
 
     /* Geometric / lattice — work on 2D planes and 3D volumes */
     PM_EFFECT_CHECKERBOARD,

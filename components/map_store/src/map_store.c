@@ -7,6 +7,9 @@
 static const char *TAG = "map_store";
 static const char *PART_LABEL = "storage";
 
+/* Map occupies [0, MAP_REGION); media store uses the remainder of `storage`. */
+static const size_t MAP_REGION = 0x40000u; /* 256 KiB */
+
 /* On-disk layout: magic(4) + version(4) + json_len(4) + json bytes */
 static const uint32_t MAP_MAGIC = 0x504D4D31u; /* 'PMM1' */
 static const uint32_t MAP_VERSION = 1;
@@ -48,13 +51,13 @@ esp_err_t pm_map_store_save(const pm_pixel_map_t *map)
     }
 
     size_t total = 12u + json_len;
-    if (total > p->size) {
-        ESP_LOGE(TAG, "map JSON too large (%u > %u)", (unsigned)total, (unsigned)p->size);
+    if (total > MAP_REGION) {
+        ESP_LOGE(TAG, "map JSON too large (%u > %u)", (unsigned)total, (unsigned)MAP_REGION);
         free(buf);
         return ESP_ERR_INVALID_SIZE;
     }
 
-    err = esp_partition_erase_range(p, 0, p->size);
+    err = esp_partition_erase_range(p, 0, MAP_REGION);
     if (err != ESP_OK) {
         free(buf);
         return err;
@@ -86,7 +89,7 @@ esp_err_t pm_map_store_load(pm_pixel_map_t *map)
     if (err != ESP_OK) return err;
     if (hdr[0] != MAP_MAGIC || hdr[1] != MAP_VERSION) return ESP_ERR_NOT_FOUND;
     uint32_t json_len = hdr[2];
-    if (json_len == 0 || json_len > p->size - 12u || json_len > 512u * 1024u) {
+    if (json_len == 0 || json_len > MAP_REGION - 12u || json_len > 512u * 1024u) {
         return ESP_ERR_INVALID_SIZE;
     }
 
@@ -107,5 +110,5 @@ esp_err_t pm_map_store_erase(void)
 {
     const esp_partition_t *p = storage_part();
     if (!p) return ESP_ERR_NOT_FOUND;
-    return esp_partition_erase_range(p, 0, p->size);
+    return esp_partition_erase_range(p, 0, MAP_REGION);
 }

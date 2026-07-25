@@ -1,5 +1,5 @@
 idf_component_register(
     SRCS "src/effects.c"
     INCLUDE_DIRS "include"
-    REQUIRES color mapping pov effect_lua
+    REQUIRES color mapping pov effect_lua media_store
 )

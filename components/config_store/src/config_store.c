@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 static const char *TAG = "config";
@@ -168,6 +169,7 @@ void pm_config_set_defaults(pm_app_config_t *cfg)
     cfg->sacn_min_priority = 0;
     cfg->ui_pin[0] = '\0';
     cfg->ma_per_led = 60;
+    cfg->max_ma = 0; /* 0 = unlimited until the user sets a limit */
     cfg->audio_enable = false;
     cfg->audio_gpio_ws = 15;
     cfg->audio_gpio_sck = 14;
@@ -357,6 +359,34 @@ void pm_config_sync_strips(pm_app_config_t *cfg)
     cfg->gpio_data = cfg->strip_gpio[0];
 }
 
+uint32_t pm_config_full_white_ma(const pm_app_config_t *cfg)
+{
+    if (!cfg || cfg->pixel_count == 0 || cfg->ma_per_led == 0) return 0;
+    return (uint32_t)cfg->pixel_count * (uint32_t)cfg->ma_per_led;
+}
+
+uint32_t pm_config_est_ma_at_bri(const pm_app_config_t *cfg, uint8_t brightness)
+{
+    uint32_t full = pm_config_full_white_ma(cfg);
+    if (full == 0) return 0;
+    return (full * (uint32_t)brightness) / 255u;
+}
+
+uint8_t pm_config_limited_brightness(const pm_app_config_t *cfg)
+{
+    if (!cfg) return 0;
+    uint8_t bri = cfg->brightness;
+    if (cfg->max_ma == 0) return bri;
+    uint32_t full = pm_config_full_white_ma(cfg);
+    if (full == 0) return bri;
+    /* Max brightness that keeps full-white draw at or below max_ma. */
+    uint32_t max_bri = (uint32_t)(((uint64_t)cfg->max_ma * 255u) / full);
+    if (max_bri < 1) max_bri = 1;
+    if (max_bri > 255) max_bri = 255;
+    if (bri > max_bri) return (uint8_t)max_bri;
+    return bri;
+}
+
 static void coerce_unsupported_chipset(pm_app_config_t *cfg)
 {
     if (cfg->chipset == PM_CHIPSET_CUSTOM) {
@@ -501,6 +531,11 @@ esp_err_t pm_config_load(pm_app_config_t *cfg)
         if (v < 1) v = 1;
         if (v > 1000) v = 1000;
         cfg->ma_per_led = (uint16_t)v;
+    }
+    if (nvs_get_i32(h, "maxma", &v) == ESP_OK) {
+        if (v < 0) v = 0;
+        if (v > 500000) v = 500000;
+        cfg->max_ma = (uint32_t)v;
     }
     if (nvs_get_i32(h, "auden", &v) == ESP_OK) cfg->audio_enable = v != 0;
     if (nvs_get_i32(h, "audws", &v) == ESP_OK) cfg->audio_gpio_ws = v;
@@ -668,6 +703,7 @@ esp_err_t pm_config_save(const pm_app_config_t *cfg)
     nvs_set_i32(h, "sminp", cfg->sacn_min_priority);
     nvs_set_str(h, "uipin", cfg->ui_pin);
     nvs_set_i32(h, "maled", cfg->ma_per_led);
+    nvs_set_i32(h, "maxma", (int32_t)cfg->max_ma);
     nvs_set_i32(h, "auden", cfg->audio_enable ? 1 : 0);
     nvs_set_i32(h, "audws", cfg->audio_gpio_ws);
     nvs_set_i32(h, "audck", cfg->audio_gpio_sck);

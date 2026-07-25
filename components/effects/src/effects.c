@@ -1,6 +1,7 @@
 #include "effects.h"
 #include "color_engine.h"
 #include "effect_lua.h"
+#include "media_store.h"
 #include <math.h>
 
 #ifndef M_PI
@@ -72,7 +73,7 @@ const char *pm_effect_name(pm_effect_id_t id)
     case PM_EFFECT_NOISE_FIELD: return "Noise Field";
     case PM_EFFECT_RADIAL_WAVE: return "Radial Wave";
     case PM_EFFECT_PLANE_SWEEP: return "Plane Sweep";
-    case PM_EFFECT_POV_IMAGE_PLANE: return "POV Image Plane";
+    case PM_EFFECT_POV_IMAGE_PLANE: return "Image Map";
     case PM_EFFECT_CHECKERBOARD: return "Checkerboard";
     case PM_EFFECT_STRIPES: return "Stripes";
     case PM_EFFECT_CARTESIAN_GRID: return "Cartesian Grid";
@@ -294,18 +295,20 @@ pm_rgb_t pm_effect_eval(const pm_effect_context_t *ctx, uint16_t map_index)
         break;
     }
     case PM_EFFECT_POV_IMAGE_PLANE: {
-        float r = sqrtf(x * x + y * y);
-        float ang = atan2f(y, x);
-        float spokes = 6.0f;
-        float a = ang / (float)(2.0 * M_PI);
-        if (a < 0.0f) a += 1.0f;
-        float spoke = fabsf(sinf(a * (float)M_PI * spokes));
-        float ring = 0.5f + 0.5f * sinf(r * 14.0f);
-        float mix = spoke * 0.65f + ring * 0.35f;
-        hsv.h = (uint8_t)((a * 255.0f) + r * 30.0f);
-        hsv.s = 230;
-        hsv.v = (uint8_t)(mix * 255.0f * inten);
-        break;
+        /* Scale zooms into the image; Position/Rotation shift the UV window. */
+        float uu = (pos.x - 0.5f) * scale + 0.5f;
+        float vv = 1.0f - ((pos.y - 0.5f) * scale + 0.5f);
+        uint8_t mr = 0, mg = 0, mb = 0;
+        if (uu < 0.0f || uu > 1.0f || vv < 0.0f || vv > 1.0f ||
+            !pm_media_sample(uu, vv, t, &mr, &mg, &mb)) {
+            return (pm_rgb_t){0, 0, 0};
+        }
+        pm_rgb_t sampled = {
+            (uint8_t)(mr * inten),
+            (uint8_t)(mg * inten),
+            (uint8_t)(mb * inten),
+        };
+        return sampled;
     }
 
     case PM_EFFECT_CHECKERBOARD: {

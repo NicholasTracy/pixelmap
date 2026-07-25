@@ -11,9 +11,11 @@
 #include "pm_version.h"
 #include "pov.h"
 #include "effect_lua.h"
+#include "effects.h"
 #include "ota_update.h"
 #include "presets.h"
 #include "map_store.h"
+#include "media_store.h"
 #include "audio.h"
 #include "wifi_mgr.h"
 #include "pm_security.h"
@@ -356,6 +358,13 @@ static esp_err_t h_get_config(httpd_req_t *req)
     cJSON_AddStringToObject(o, "host", c->hostname);
     cJSON_AddStringToObject(o, "otaPart", pm_ota_running_label());
     cJSON_AddNumberToObject(o, "maled", c->ma_per_led);
+    cJSON_AddNumberToObject(o, "maxma", c->max_ma);
+    {
+        uint8_t bri_eff = pm_config_limited_brightness(c);
+        cJSON_AddNumberToObject(o, "briEff", bri_eff);
+        cJSON_AddNumberToObject(o, "estMaFull", pm_config_full_white_ma(c));
+        cJSON_AddNumberToObject(o, "estMa", pm_config_est_ma_at_bri(c, bri_eff));
+    }
     cJSON_AddNumberToObject(o, "sminp", c->sacn_min_priority);
     cJSON_AddBoolToObject(o, "auden", c->audio_enable);
     cJSON_AddNumberToObject(o, "audws", c->audio_gpio_ws);
@@ -707,6 +716,12 @@ static esp_err_t h_post_config(httpd_req_t *req)
         if (m < 1) m = 1;
         if (m > 1000) m = 1000;
         c->ma_per_led = (uint16_t)m;
+    }
+    if ((v = cJSON_GetObjectItem(j, "maxma")) && cJSON_IsNumber(v)) {
+        int m = (int)v->valuedouble;
+        if (m < 0) m = 0;
+        if (m > 500000) m = 500000;
+        c->max_ma = (uint32_t)m;
     }
     /* Empty string clears PIN; omit keeps current. */
     if ((v = cJSON_GetObjectItem(j, "uipin")) && cJSON_IsString(v)) {
@@ -1090,6 +1105,116 @@ static esp_err_t h_post_factory_reset(httpd_req_t *req)
     s_session[0] = '\0';
     pm_config_factory_reset_nvs();
     pm_map_store_erase();
+    pm_media_store_erase();
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"ok\":true,\"reboot\":true}");
+    schedule_reboot();
+    return ESP_OK;
+}
+
+static esp_err_t h_get_media(httpd_req_t *req)
+{
+    if (!auth_ok(req, false)) return reject_pin(req);
+    cJSON *o = cJSON_CreateObject();
+    bool has = pm_media_has_image();
+    cJSON_AddBoolToObject(o, "has", has);
+    cJSON_AddNumberToObject(o, "maxW", PM_MEDIA_MAX_W);
+    cJSON_AddNumberToObject(o, "maxH", PM_MEDIA_MAX_H);
+    cJSON_AddNumberToObject(o, "maxFrames", PM_MEDIA_MAX_FRAMES);
+    cJSON_AddNumberToObject(o, "maxBytes", PM_STORAGE_MEDIA_BYTES);
+    if (has) {
+        pm_media_info_t info;
+        pm_media_get_info(&info);
+        cJSON_AddNumberToObject(o, "w", info.w);
+        cJSON_AddNumberToObject(o, "h", info.h);
+        cJSON_AddNumberToObject(o, "frames", info.frames);
+        cJSON_AddNumberToObject(o, "fps", info.fps_x100 / 100.0);
+        cJSON_AddNumberToObject(o, "bytes", (double)pm_media_blob_size());
+    }
+    return send_json(req, o);
+}
+
+static esp_err_t h_get_media_bin(httpd_req_t *req)
+{
+    if (!auth_ok(req, false)) return reject_pin(req);
+    size_t need = pm_media_blob_size();
+    if (need == 0) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "no media");
+        return ESP_FAIL;
+    }
+    uint8_t *buf = malloc(need);
+    if (!buf) return ESP_ERR_NO_MEM;
+    size_t out = 0;
+    esp_err_t err = pm_media_export_blob(buf, need, &out);
+    if (err != ESP_OK) {
+        free(buf);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/octet-stream");
+    err = httpd_resp_send(req, (const char *)buf, out);
+    free(buf);
+    return err;
+}
+
+static esp_err_t h_post_media(httpd_req_t *req)
+{
+    if (!pin_ok(req)) return reject_pin(req);
+    if (req->content_len <= 0 || (size_t)req->content_len > PM_STORAGE_MEDIA_BYTES) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad size");
+        return ESP_FAIL;
+    }
+    size_t total = (size_t)req->content_len;
+    uint8_t *buf = malloc(total);
+    if (!buf) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "oom");
+        return ESP_FAIL;
+    }
+    size_t got = 0;
+    while (got < total) {
+        int r = httpd_req_recv(req, (char *)buf + got, total - got);
+        if (r <= 0) {
+            free(buf);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "recv");
+            return ESP_FAIL;
+        }
+        got += (size_t)r;
+    }
+    esp_err_t err = pm_media_store_set_blob(buf, total);
+    free(buf);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, esp_err_to_name(err));
+        return ESP_FAIL;
+    }
+    pm_config_lock();
+    s_hooks.cfg->effect_id = PM_EFFECT_POV_IMAGE_PLANE;
+    pm_config_save(s_hooks.cfg);
+    pm_config_unlock();
+    if (s_hooks.on_config_changed) s_hooks.on_config_changed();
+    pm_media_info_t info;
+    pm_media_get_info(&info);
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "ok", true);
+    cJSON_AddNumberToObject(o, "w", info.w);
+    cJSON_AddNumberToObject(o, "h", info.h);
+    cJSON_AddNumberToObject(o, "frames", info.frames);
+    cJSON_AddNumberToObject(o, "fps", info.fps_x100 / 100.0);
+    return send_json(req, o);
+}
+
+static esp_err_t h_delete_media(httpd_req_t *req)
+{
+    if (!pin_ok(req)) return reject_pin(req);
+    esp_err_t err = pm_media_store_erase();
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "ok", err == ESP_OK);
+    if (err != ESP_OK) cJSON_AddStringToObject(o, "error", esp_err_to_name(err));
+    return send_json(req, o);
+}
+
+static esp_err_t h_post_reboot(httpd_req_t *req)
+{
+    if (!pin_ok(req)) return reject_pin(req);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, "{\"ok\":true,\"reboot\":true}");
     schedule_reboot();
@@ -1315,6 +1440,10 @@ static esp_err_t h_get_wifi_status(httpd_req_t *req)
     cJSON_AddStringToObject(o, "apSsid", st.ap_ssid);
     cJSON_AddStringToObject(o, "host", st.hostname);
     cJSON_AddStringToObject(o, "otaPart", pm_ota_running_label());
+    /* Ethernet stack not present yet — keep UI gated off until hardware support lands. */
+    cJSON_AddBoolToObject(o, "ethCapable", false);
+    cJSON_AddBoolToObject(o, "eth", false);
+    cJSON_AddStringToObject(o, "ethIp", "");
     return send_json(req, o);
 }
 
@@ -1350,7 +1479,7 @@ esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
     if (!hooks || !hooks->cfg || !hooks->map) return ESP_ERR_INVALID_ARG;
     s_hooks = *hooks;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 40;
+    config.max_uri_handlers = 48;
     config.stack_size = 10240;
     ESP_RETURN_ON_ERROR(httpd_start(&s_server, &config), TAG, "httpd");
 
@@ -1374,11 +1503,16 @@ esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
         {.uri = "/api/map/grid", .method = HTTP_POST, .handler = h_post_grid},
         {.uri = "/api/fx/lua", .method = HTTP_GET, .handler = h_get_fx_lua},
         {.uri = "/api/fx/lua", .method = HTTP_POST, .handler = h_post_fx_lua},
+        {.uri = "/api/media", .method = HTTP_GET, .handler = h_get_media},
+        {.uri = "/api/media", .method = HTTP_POST, .handler = h_post_media},
+        {.uri = "/api/media", .method = HTTP_DELETE, .handler = h_delete_media},
+        {.uri = "/api/media.bin", .method = HTTP_GET, .handler = h_get_media_bin},
         {.uri = "/api/ota", .method = HTTP_GET, .handler = h_get_ota},
         {.uri = "/api/ota", .method = HTTP_POST, .handler = h_post_ota},
         {.uri = "/api/presets", .method = HTTP_GET, .handler = h_get_presets},
         {.uri = "/api/presets", .method = HTTP_POST, .handler = h_post_presets},
         {.uri = "/api/factory_reset", .method = HTTP_POST, .handler = h_post_factory_reset},
+        {.uri = "/api/reboot", .method = HTTP_POST, .handler = h_post_reboot},
         {.uri = "/api/audio", .method = HTTP_GET, .handler = h_get_audio},
     };
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); ++i) {

@@ -9,6 +9,7 @@
 #include "led_strip.h"
 #include "pixel_map.h"
 #include "map_store.h"
+#include "media_store.h"
 #include "effects.h"
 #include "effect_lua.h"
 #include "pov.h"
@@ -51,10 +52,11 @@ static void destroy_buses(void)
 
 static void apply_correction(void)
 {
+    uint8_t bri = pm_config_limited_brightness(&s_cfg);
     for (uint8_t i = 0; i < s_bus_count; ++i) {
         if (!s_buses[i]) continue;
         pm_color_correction_t cc = *pm_led_strip_get_correction(s_buses[i]);
-        cc.brightness = s_cfg.brightness;
+        cc.brightness = bri;
         cc.gamma = s_cfg.gamma;
         cc.auto_white = s_cfg.auto_white; /* from Strip tab / API */
         /* FastLED-ish typical LED strip correction */
@@ -500,6 +502,9 @@ void app_main(void)
     }
 
     pm_map_store_mount();
+    if (pm_media_store_init() != ESP_OK) {
+        ESP_LOGW(TAG, "media store empty or unavailable");
+    }
 
     int avoid[PM_STRIP_MAX + 1];
     uint8_t avoid_n = 0;

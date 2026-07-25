@@ -19,10 +19,14 @@ HOST = "127.0.0.1"
 PORT = 8080
 
 CONFIG = {
-    "ver": "0.1.1",
+    "ver": "0.2.0",
     "ssid": "StudioWiFi",
     "pass": "dev-secret",
     "host": "pixelmap-dev",
+    "apen": True,
+    "apfb": False,
+    "apssid": "",
+    "webAuth": False,
     "gpio": 16,
     "clk": -1,
     "sled": 2,
@@ -32,6 +36,8 @@ CONFIG = {
     "slens": [60],
     "sgpios": [16],
     "bri": 128,
+    "maled": 60,
+    "maxma": 0,
     "gamma": 220,
     "aw": True,
     "chip": "WS2812B",
@@ -559,6 +565,38 @@ local wave = 0.5 + 0.5 * sin(d * 16 - t * 4)
 return hsv((t * 40 + d * 80) % 256, 230, wave * 255)
 """
 
+MEDIA_BLOB = b""
+MEDIA_MAX_BYTES = 0x20000
+MEDIA_MAX_W = 96
+MEDIA_MAX_H = 96
+MEDIA_MAX_FRAMES = 8
+
+
+def _media_meta():
+    import struct
+
+    base = {
+        "has": False,
+        "maxW": MEDIA_MAX_W,
+        "maxH": MEDIA_MAX_H,
+        "maxFrames": MEDIA_MAX_FRAMES,
+        "maxBytes": MEDIA_MAX_BYTES,
+    }
+    if len(MEDIA_BLOB) < 16:
+        return base
+    magic, ver, w, h, frames, fps100 = struct.unpack_from("<IIHHHH", MEDIA_BLOB, 0)
+    if magic != 0x44454D50 or ver != 1:
+        return base
+    return {
+        **base,
+        "has": True,
+        "w": w,
+        "h": h,
+        "frames": frames,
+        "fps": fps100 / 100.0,
+        "bytes": len(MEDIA_BLOB),
+    }
+
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:
@@ -594,7 +632,42 @@ class Handler(BaseHTTPRequestHandler):
             pub.pop("pass", None)
             if "fxmask" not in pub:
                 pub["fxmask"] = 0x7FFFFF
+            count = int(pub.get("count") or 60)
+            maled = max(1, int(pub.get("maled") or 60))
+            bri = max(1, min(255, int(pub.get("bri") or 128)))
+            maxma = max(0, int(pub.get("maxma") or 0))
+            full = count * maled
+            bri_eff = bri
+            if maxma > 0 and full > 0:
+                max_bri = max(1, min(255, (maxma * 255) // full))
+                if bri_eff > max_bri:
+                    bri_eff = max_bri
+            pub["briEff"] = bri_eff
+            pub["estMaFull"] = full
+            pub["estMa"] = (full * bri_eff) // 255
             self._json(200, pub)
+            return
+        if path == "/api/wifi/status":
+            self._json(
+                200,
+                {
+                    "mode": "APSTA",
+                    "sta": True,
+                    "staConnecting": False,
+                    "ap": True,
+                    "apen": bool(CONFIG.get("apen", True)),
+                    "apfb": bool(CONFIG.get("apfb", False)),
+                    "staIp": "192.168.1.50",
+                    "apIp": "192.168.4.1",
+                    "staSsid": CONFIG.get("ssid") or "StudioWiFi",
+                    "apSsid": CONFIG.get("apssid") or "PixelMap-DEV",
+                    "host": CONFIG.get("host") or "pixelmap-dev",
+                    "otaPart": "ota_0",
+                    "ethCapable": False,
+                    "eth": False,
+                    "ethIp": "",
+                },
+            )
             return
         if path == "/api/map":
             self._json(200, MAP)
@@ -610,6 +683,15 @@ class Handler(BaseHTTPRequestHandler):
                 },
             )
             return
+        if path == "/api/media":
+            self._json(200, _media_meta())
+            return
+        if path == "/api/media.bin":
+            if len(MEDIA_BLOB) < 16:
+                self._json(404, {"error": "no media"})
+                return
+            self._send(200, MEDIA_BLOB, "application/octet-stream")
+            return
 
         rel = path.lstrip("/")
         candidate = (UI_DIR / rel).resolve()
@@ -621,8 +703,25 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not found", "path": path})
 
     def do_POST(self) -> None:
-        global MAP, LUA_SCRIPT
+        global MAP, LUA_SCRIPT, MEDIA_BLOB
         path = urlparse(self.path).path
+
+        if path == "/api/media":
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            raw = self.rfile.read(length) if length else b""
+            if length < 16 or length > MEDIA_MAX_BYTES:
+                self._json(400, {"ok": False, "error": "bad size"})
+                return
+            MEDIA_BLOB = raw
+            meta = _media_meta()
+            if not meta.get("has"):
+                MEDIA_BLOB = b""
+                self._json(400, {"ok": False, "error": "bad media"})
+                return
+            CONFIG["fx"] = 6
+            self._json(200, {"ok": True, **{k: meta[k] for k in ("w", "h", "frames", "fps") if k in meta}})
+            return
+
         try:
             payload = self._read_json()
         except json.JSONDecodeError:
@@ -718,6 +817,19 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, {"ok": True, "ready": True, "error": "ok"})
             return
 
+        if path == "/api/reboot":
+            self._json(200, {"ok": True, "reboot": True})
+            return
+
+        self._json(404, {"ok": False, "error": "not found", "path": path})
+
+    def do_DELETE(self) -> None:
+        global MEDIA_BLOB
+        path = urlparse(self.path).path
+        if path == "/api/media":
+            MEDIA_BLOB = b""
+            self._json(200, {"ok": True})
+            return
         self._json(404, {"ok": False, "error": "not found", "path": path})
 
 
@@ -726,7 +838,7 @@ def main() -> None:
         raise SystemExit(f"UI not found: {INDEX}")
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"PixelMap web UI preview: http://{HOST}:{PORT}/")
-    print("Mock APIs: /api/config, /api/map, /api/map/grid, /api/fx/lua  (Ctrl+C to stop)")
+    print("Mock APIs: /api/config, /api/map, /api/map/grid, /api/fx/lua, /api/media  (Ctrl+C to stop)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

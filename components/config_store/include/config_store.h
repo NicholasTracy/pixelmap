@@ -149,8 +149,13 @@ typedef struct {
     char ui_pin[8];
     /** True until the user sets a new web password (≥12 chars) after bootstrap. */
     bool web_pass_rotate;
-    /** Estimated mA per LED at full white (UI power guidance). */
+    /** Estimated mA per LED at full white (all channels on). */
     uint16_t ma_per_led;
+    /**
+     * Max total string current (mA) at full white across all strips.
+     * 0 = no limit. When exceeded, global brightness is scaled down for every strip.
+     */
+    uint32_t max_ma;
 
     /** I2S MEMS mic (INMP441-style) audio reactive. */
     bool audio_enable;
@@ -173,6 +178,25 @@ esp_err_t pm_config_factory_reset_nvs(void);
 int pm_config_default_strip_gpio(uint8_t strip_index);
 /** Clamp strip_count / lengths / GPIOs; pixel_count = sum(strip_len); gpio_data = strip_gpio[0]. */
 void pm_config_sync_strips(pm_app_config_t *cfg);
+
+/**
+ * Full-white string current (mA) for all pixels: pixel_count × ma_per_led.
+ * Assumes every LED at full RGB (all channels on).
+ */
+uint32_t pm_config_full_white_ma(const pm_app_config_t *cfg);
+
+/**
+ * Estimated draw (mA) at the given brightness scale (0–255), before max_ma limiting:
+ * full_white_ma × brightness / 255.
+ */
+uint32_t pm_config_est_ma_at_bri(const pm_app_config_t *cfg, uint8_t brightness);
+
+/**
+ * Brightness after applying max_ma protection (same value for every strip).
+ * If max_ma is 0, returns cfg->brightness unchanged.
+ */
+uint8_t pm_config_limited_brightness(const pm_app_config_t *cfg);
+
 /** Fill runtime effect params from config (no DMX overlay). */
 void pm_config_fill_effect_params(const pm_app_config_t *cfg, pm_effect_params_t *out);
 /**
