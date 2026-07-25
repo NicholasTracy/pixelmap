@@ -9,6 +9,7 @@ pkg_check_modules(CJSON REQUIRED libcjson)
 add_executable(virtbench
   main.c
   stubs/effect_lua_stub.c
+  stubs/media_store_stub.c
   "${ROOT}/components/color/src/color_engine.c"
   "${ROOT}/components/mapping/src/pixel_map.c"
   "${ROOT}/components/pov/src/pov.c"
@@ -23,6 +24,7 @@ target_include_directories(virtbench PRIVATE
   "${ROOT}/components/pov/include"
   "${ROOT}/components/effects/include"
   "${ROOT}/components/effect_lua/include"
+  "${ROOT}/components/media_store/include"
   "${ROOT}/components/led_driver/include"
   ${CJSON_INCLUDE_DIRS}
 )
