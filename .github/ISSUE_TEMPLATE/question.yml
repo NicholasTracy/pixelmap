@@ -1,0 +1,40 @@
+name: Question / help
+description: Ask how something works, or confirm expected behavior.
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For setup and flashing, start with the [README](https://github.com/NicholasTracy/pixelmap#readme). Use this form when the docs do not answer your question.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      options:
+        - Flashing / first boot
+        - SoftAP setup / Wi‑Fi
+        - Web UI
+        - LED wiring / board pins
+        - Effects / Motion / Map
+        - Art-Net / sACN
+        - Audio
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Board and setup (if relevant)
+      placeholder: "ESP32-S3 · WS2812B × 120 · Art-Net from Resolume"
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you already tried?
+      description: README sections you read, settings you changed, browsers or lighting apps you used.

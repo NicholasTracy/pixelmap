@@ -7,6 +7,7 @@
 
 #include "config_store.h"
 #include "led_strip.h"
+#include "led_chipsets.h"
 #include "pixel_map.h"
 #include "map_store.h"
 #include "media_store.h"
@@ -31,6 +32,39 @@ static uint16_t s_total_len;
 static pm_pixel_map_t *s_map;
 static uint8_t *s_dmx_merge;
 static size_t s_dmx_merge_len;
+static uint8_t s_dmx_ch = 3; /* color channels packed per LED in pixel mode */
+
+static uint8_t dmx_channels_per_pixel(pm_chipset_t chip)
+{
+    const pm_chipset_timing_t *t = pm_chipset_timing(chip);
+    uint8_t ch = t ? t->channels : 3;
+    if (ch < 3) ch = 3;
+    /* Pack RGB or RGBW; RGBWW uses first 4 channels for DMX mapping. */
+    if (ch > 4) ch = 4;
+    return ch;
+}
+
+static uint16_t dmx_universes_for(uint16_t leds, uint8_t ch)
+{
+    size_t need = (size_t)leds * (size_t)ch;
+    if (need == 0) return 1;
+    size_t u = (need + 511u) / 512u;
+    if (u < 1) u = 1;
+    if (u > 16) u = 16;
+    return (uint16_t)u;
+}
+
+/** Keep universe_count large enough for 1:1 pixel DMX when in Each-LED mode. */
+static bool sync_pixel_dmx_universes(void)
+{
+    if (s_cfg.dmx_mode != PM_DMX_MODE_PIXELS) return false;
+    pm_config_sync_strips(&s_cfg);
+    uint8_t ch = dmx_channels_per_pixel(s_cfg.chipset);
+    uint16_t need = dmx_universes_for(s_cfg.pixel_count, ch);
+    if (s_cfg.universe_count == need) return false;
+    s_cfg.universe_count = need;
+    return true;
+}
 static volatile bool s_rebuild;
 static volatile bool s_strip_fault;
 static bool s_artnet_running;
@@ -111,9 +145,19 @@ static esp_err_t rebuild_strip(void)
     s_strip_fault = false;
     apply_correction();
 
+    s_dmx_ch = dmx_channels_per_pixel(s_cfg.chipset);
+    if (s_cfg.dmx_mode == PM_DMX_MODE_PIXELS) {
+        uint16_t need_u = dmx_universes_for(s_total_len, s_dmx_ch);
+        if (s_cfg.universe_count != need_u) {
+            s_cfg.universe_count = need_u;
+            ESP_LOGI(TAG, "pixel DMX needs %u universe(s) (%u LEDs × %u ch)",
+                     (unsigned)need_u, (unsigned)s_total_len, (unsigned)s_dmx_ch);
+        }
+    }
+
     free(s_dmx_merge);
     s_dmx_merge = NULL;
-    s_dmx_merge_len = (size_t)s_total_len * 3;
+    s_dmx_merge_len = (size_t)s_total_len * (size_t)s_dmx_ch;
     if (s_dmx_merge_len > 0) {
         s_dmx_merge = calloc(1, s_dmx_merge_len);
         if (!s_dmx_merge) {
@@ -127,7 +171,9 @@ static esp_err_t rebuild_strip(void)
             ESP_LOGE(TAG, "map capacity grow failed: %s", esp_err_to_name(merr));
         }
     }
-    ESP_LOGI(TAG, "buses=%u total_leds=%u", (unsigned)s_bus_count, (unsigned)s_total_len);
+    ESP_LOGI(TAG, "buses=%u total_leds=%u dmx_ch=%u merge=%u",
+             (unsigned)s_bus_count, (unsigned)s_total_len,
+             (unsigned)s_dmx_ch, (unsigned)s_dmx_merge_len);
     return ESP_OK;
 }
 
@@ -339,6 +385,9 @@ static void sync_audio(void)
 
 static void on_config_changed(void)
 {
+    if (sync_pixel_dmx_universes()) {
+        pm_config_save(&s_cfg);
+    }
     s_rebuild = true;
     apply_correction();
     /* Map points are owned by /api/map (+ SPIFFS). Layout params only seed
@@ -377,16 +426,48 @@ static void on_dmx(uint16_t universe, const uint8_t *data, uint16_t len, void *u
 static void render_from_dmx(void)
 {
     if (!s_bus_count || !s_dmx_merge) return;
+    uint8_t ch = s_dmx_ch >= 3 ? s_dmx_ch : 3;
     for (uint16_t i = 0; i < s_total_len; ++i) {
-        size_t o = (size_t)i * 3;
+        size_t o = (size_t)i * ch;
         if (o + 2 >= s_dmx_merge_len) break;
         pm_led_strip_t *bus = NULL;
         uint16_t local = 0;
         if (!resolve_bus(i, &bus, &local)) continue;
-        pm_led_strip_set_rgb(bus, local, (pm_rgb_t){
-            s_dmx_merge[o], s_dmx_merge[o + 1], s_dmx_merge[o + 2]
-        });
+        if (ch >= 4 && o + 3 < s_dmx_merge_len) {
+            pm_led_strip_set_rgbw(bus, local, (pm_rgbw_t){
+                s_dmx_merge[o], s_dmx_merge[o + 1], s_dmx_merge[o + 2], s_dmx_merge[o + 3]
+            });
+        } else {
+            pm_led_strip_set_rgb(bus, local, (pm_rgb_t){
+                s_dmx_merge[o], s_dmx_merge[o + 1], s_dmx_merge[o + 2]
+            });
+        }
     }
+}
+
+static size_t dmx_rgb_snapshot(uint8_t *dst, size_t dst_cap, bool *active)
+{
+    pm_config_lock();
+    pm_app_config_t cfg = s_cfg;
+    pm_config_unlock();
+    bool net = (cfg.artnet_enable && pm_artnet_active(1500)) ||
+               (cfg.sacn_enable && pm_sacn_active(1500));
+    if (active) *active = net && cfg.dmx_mode == PM_DMX_MODE_PIXELS;
+    if (!dst || !s_dmx_merge || s_total_len == 0) return 0;
+    uint8_t ch = s_dmx_ch >= 3 ? s_dmx_ch : 3;
+    size_t n = s_total_len;
+    if (dst_cap < n * 3u) n = dst_cap / 3u;
+    for (size_t i = 0; i < n; ++i) {
+        size_t o = i * ch;
+        if (o + 2 >= s_dmx_merge_len) {
+            n = i;
+            break;
+        }
+        dst[i * 3u + 0] = s_dmx_merge[o];
+        dst[i * 3u + 1] = s_dmx_merge[o + 1];
+        dst[i * 3u + 2] = s_dmx_merge[o + 2];
+    }
+    return n;
 }
 
 static esp_err_t show_all_buses(void)
@@ -556,6 +637,7 @@ void app_main(void)
         .map = s_map,
         .on_config_changed = on_config_changed,
         .on_map_changed = on_map_changed,
+        .dmx_rgb_snapshot = dmx_rgb_snapshot,
     };
     ESP_ERROR_CHECK(pm_web_ui_start(&ui));
 

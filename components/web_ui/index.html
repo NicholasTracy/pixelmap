@@ -199,7 +199,9 @@ input.form-control[type=number],
 .fx-media-meta{min-width:0;flex:1 1 auto;padding-top:.1rem}
 .fx-media-meta #fxMediaInfo{margin:0;font-size:.72rem;line-height:1.35;color:var(--muted)}
 .fx-media-meta .pm-status{margin-top:.2rem;min-height:1em;font-size:.72rem}
-.tab-pane{padding-top:.55rem}
+.nav-tabs .nav-link.pm-tab-disabled{opacity:.4;pointer-events:none;filter:grayscale(.35)}
+.fx-workspace.is-dmx-pixels .fx-sliders{opacity:.4;pointer-events:none;filter:grayscale(.35)}
+.fx-workspace.is-dmx-pixels #saveEffects{pointer-events:none}
 .container-fluid{--bs-gutter-x:1rem}
 @media (max-width:575.98px){
   .pm-header h1{font-size:1.2rem}
@@ -339,6 +341,24 @@ input.form-control[type=number],
     <div class="tab-pane fade" id="pane-strip">
       <div class="pm-panel">
         <h2 class="pm-section-title">LED lights</h2>
+        <div class="pm-inline-fields mb-2">
+          <div class="pm-field-stack" style="min-width:min(100%,18rem)">
+            <label class="form-label" for="boardSel">Board</label>
+            <select class="form-select pm-field-lg" id="boardSel" title="Pin layout for your MCU / wiring">
+              <option value="">Custom pins…</option>
+            </select>
+          </div>
+          <div class="pm-field-stack">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-pm" type="button" id="boardApply">Load board pins</button>
+          </div>
+          <div class="pm-field-stack" style="flex:1 1 12rem;min-width:10rem">
+            <label class="form-label">&nbsp;</label>
+            <p class="pm-help mb-0" id="boardNotes">Pick a board to fill data, clock, status, and mic pins. Matching MCU profiles are listed first.</p>
+          </div>
+        </div>
+        <input type="hidden" id="boardId" value=""/>
+        <input type="hidden" id="mcu" value="esp32"/>
         <div class="pm-inline-fields">
           <div class="pm-field-stack">
             <label class="form-label" for="scnt">Number of strips</label>
@@ -634,6 +654,7 @@ return hsv((ph + t * 40 + d * 80 * p2) % 256, ps, wave * pv * intensity)</textar
           <div class="col-md-4">
             <label class="form-label" for="ucnt">Number of universes</label>
             <input class="form-control pm-field-num" id="ucnt" type="number" min="1" max="16" value="4"/>
+            <p class="pm-help mb-0 mt-1" id="ucntHint" hidden></p>
           </div>
           <div class="col-md-4">
             <label class="form-label" for="dmxmode">What the stream controls</label>
@@ -655,12 +676,16 @@ return hsv((ph + t * 40 + d * 80 * p2) % 256, ps, wave * pv * intensity)</textar
         <div id="presetSlots" class="d-flex flex-column gap-2"></div>
         <div class="pm-status" id="statusPresets"></div>
       </div>
-      <div class="pm-panel mt-3">
+      <div class="pm-panel mt-3" id="ctlKnobsPanel">
         <h2 class="pm-section-title">Effect knobs</h2>
         <p class="pm-help mt-0" id="ctlChannelHelp">Channels 1–23. When no lighting stream is active, meters follow the base value plus any motion you set.</p>
         <div id="ctlChannelRows"></div>
         <button class="btn btn-pm-primary mt-3" type="button" id="saveControl">Save control</button>
         <div class="pm-status" id="statusControl"></div>
+      </div>
+      <div class="pm-panel mt-3" id="ctlPixelMapPanel" hidden>
+        <h2 class="pm-section-title">Each LED channel map</h2>
+        <p class="pm-help mt-0 mb-0" id="ctlPixelMapHelp">Each light uses consecutive color channels. When a universe fills (512 channels), mapping continues on the next universe.</p>
       </div>
     </div>
 
@@ -870,7 +895,7 @@ const DEFAULT_FX_ORBIT = { yaw: 0.65, pitch: 0.5, zoom: 1.95 };
 const DEFAULT_DASH_ORBIT = { yaw: 0.7, pitch: 0.48, zoom: 1.85 };
 const STRIP_MAX = 8;
 const STRIP_COLORS = ['#3dffa8','#7eb6ff','#ffb454','#e07aff','#ff6b6b','#5eead4','#f0e68c','#c4b5fd'];
-/* WLED-friendly ESP32 defaults, then extra common / custom-hardware pins */
+/* Fallback when boards catalog is unavailable — mirrors boards/wled_esp32_default.json */
 const DEFAULT_STRIP_GPIOS = [16, 2, 4, 13, 14, 15, 18, 19];
 const GPIO_PRESETS = [
   { v: 16, label: 'Pin 16 — common default' },
@@ -890,8 +915,128 @@ const GPIO_PRESETS = [
   { v: 32, label: 'Pin 32' },
   { v: 33, label: 'Pin 33' },
   { v: 38, label: 'Pin 38 — ESP32-S3 boards' },
+  { v: 39, label: 'Pin 39' },
+  { v: 40, label: 'Pin 40' },
+  { v: 41, label: 'Pin 41' },
+  { v: 42, label: 'Pin 42' },
+  { v: 48, label: 'Pin 48 — S3 status LED' },
+  { v: 1, label: 'Pin 1' },
   { v: -1, label: 'Custom…' },
 ];
+let boardsCatalog = [];
+let boardsMcu = 'esp32';
+
+function currentMcu(){
+  return (document.getElementById('mcu')?.value || boardsMcu || 'esp32').toLowerCase();
+}
+function findBoard(id){
+  if (!id) return null;
+  return boardsCatalog.find(b => b.id === id) || null;
+}
+function defaultBoardForMcu(mcu){
+  const m = (mcu || currentMcu()).toLowerCase();
+  const match = boardsCatalog.filter(b => (b.mcu || '').toLowerCase() === m);
+  return match.find(b => b.default) || match[0] || boardsCatalog[0] || null;
+}
+function populateBoardSelect(selectedId){
+  const sel = document.getElementById('boardSel');
+  if (!sel) return;
+  const mcu = currentMcu();
+  const prev = selectedId != null ? selectedId : sel.value;
+  sel.innerHTML = '';
+  const optCustom = document.createElement('option');
+  optCustom.value = '';
+  optCustom.textContent = 'Custom pins…';
+  sel.appendChild(optCustom);
+  const preferred = boardsCatalog.filter(b => (b.mcu || '').toLowerCase() === mcu);
+  const other = boardsCatalog.filter(b => (b.mcu || '').toLowerCase() !== mcu);
+  const addGroup = (label, list) => {
+    if (!list.length) return;
+    const og = document.createElement('optgroup');
+    og.label = label;
+    list.forEach(b => {
+      const o = document.createElement('option');
+      o.value = b.id;
+      o.textContent = b.name + (b.default ? ' ★' : '');
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  };
+  addGroup(mcu.toUpperCase() + ' boards', preferred);
+  addGroup('Other MCUs', other);
+  if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  else {
+    const def = defaultBoardForMcu(mcu);
+    sel.value = def ? def.id : '';
+  }
+  updateBoardNotes();
+}
+function updateBoardNotes(){
+  const notes = document.getElementById('boardNotes');
+  const b = findBoard(document.getElementById('boardSel')?.value);
+  if (!notes) return;
+  if (!b) {
+    notes.textContent = 'Custom pins — or pick a board profile for your ' + currentMcu().toUpperCase() + ' wiring.';
+    return;
+  }
+  notes.textContent = (b.notes || b.name) + (b.mcu ? (' · ' + String(b.mcu).toUpperCase()) : '');
+}
+function applyBoardProfile(board, { saveHint } = {}){
+  if (!board || !board.pins) return;
+  const pins = board.pins;
+  const led = Array.isArray(pins.led_data) ? pins.led_data.map(x => +x | 0).filter(g => g >= 0) : [];
+  if (!led.length) return;
+
+  const scEl = document.getElementById('scnt');
+  const n = Math.max(1, Math.min(STRIP_MAX, +(scEl && scEl.value) || 1));
+  const gpios = [];
+  for (let i = 0; i < n; i++) gpios.push(led[i] != null ? led[i] : (DEFAULT_STRIP_GPIOS[i] ?? led[0] ?? 16));
+  const lens = stripLengths();
+  while (lens.length < n) lens.push(60);
+  rebuildStripLenFields(lens.slice(0, n), gpios);
+
+  if (pins.led_clock != null) clk.value = String(pins.led_clock | 0);
+  if (pins.status_led != null) sled.value = String(pins.status_led | 0);
+  if (pins.status_led_active_high != null) sledh.checked = !!pins.status_led_active_high;
+  if (pins.audio_ws != null && document.getElementById('audws')) audws.value = String(pins.audio_ws | 0);
+  if (pins.audio_sck != null && document.getElementById('audck')) audck.value = String(pins.audio_sck | 0);
+  if (pins.audio_sd != null && document.getElementById('audsd')) audsd.value = String(pins.audio_sd | 0);
+
+  const def = board.defaults || {};
+  if (def.chipset && [...chip.options].some(o => o.value === def.chipset || o.text === def.chipset)) {
+    chip.value = def.chipset;
+  }
+  if (def.color_order && [...order.options].some(o => o.value === def.color_order || o.text === def.color_order)) {
+    order.value = def.color_order;
+  }
+  if (def.max_ma != null && document.getElementById('maxma') && !(+maxma.value > 0)) {
+    maxma.value = String(def.max_ma | 0);
+  }
+
+  const boardEl = document.getElementById('boardId');
+  if (boardEl) boardEl.value = board.id || '';
+  const sel = document.getElementById('boardSel');
+  if (sel) sel.value = board.id || '';
+  updateBoardNotes();
+  syncStripGpioWarn();
+  updateGates();
+  updatePowerEst();
+  if (saveHint) setStatus(statusStrip, true, 'Pins loaded from ' + (board.name || board.id) + ' — Save lights to keep them.');
+}
+async function loadBoardsCatalog(){
+  try {
+    const r = await fetch('/api/boards', { credentials: 'same-origin', headers: apiHeaders() });
+    if (!r.ok) return;
+    const j = await r.json();
+    boardsCatalog = Array.isArray(j.boards) ? j.boards : [];
+    if (j.mcu) {
+      boardsMcu = j.mcu;
+      const mcuEl = document.getElementById('mcu');
+      if (mcuEl) mcuEl.value = j.mcu;
+    }
+    populateBoardSelect(document.getElementById('boardId')?.value || '');
+  } catch (_) {}
+}
 let mapOrbit = { ...DEFAULT_MAP_ORBIT, dragging: false, lastX: 0, lastY: 0 };
 let fxOrbit = { ...DEFAULT_FX_ORBIT, dragging: false, lastX: 0, lastY: 0 };
 let dashOrbit = { ...DEFAULT_DASH_ORBIT, dragging: false, lastX: 0, lastY: 0 };
@@ -989,6 +1134,7 @@ function syncStripTotal(){
   }
   syncStripGpioWarn();
   updatePowerEst();
+  if (typeof syncDmxPixelUi === 'function') syncDmxPixelUi();
   return total;
 }
 
@@ -1338,6 +1484,108 @@ function fxModMix(base, lo, hi, wave, depth){
 }
 function dmxNetEnabled(){
   return !!(aen && aen.checked) || !!(sen && sen.checked);
+}
+function dmxPixelMode(){
+  return (+(document.getElementById('dmxmode')?.value || 1) | 0) === 0;
+}
+function dmxChannelsPerPixel(){
+  const name = (document.getElementById('chip')?.value) ? String(chip.value) : 'WS2812B';
+  if (/SK6812|TM1814|RGBW/i.test(name)) return 4;
+  return 3;
+}
+function dmxUniversesNeeded(leds, ch){
+  const need = Math.max(0, leds | 0) * Math.max(3, ch | 0);
+  if (!need) return 1;
+  return Math.max(1, Math.min(16, Math.ceil(need / 512)));
+}
+function syncDmxPixelUi(){
+  const pixel = dmxPixelMode();
+  const knobs = document.getElementById('ctlKnobsPanel');
+  const mapPanel = document.getElementById('ctlPixelMapPanel');
+  if (knobs) knobs.hidden = pixel;
+  if (mapPanel) mapPanel.hidden = !pixel;
+
+  const tabFx = document.getElementById('tab-effects');
+  if (tabFx) {
+    tabFx.classList.toggle('pm-tab-disabled', pixel);
+    tabFx.title = pixel
+      ? 'Effects are paused while Each LED color is selected — lights follow DMX 1:1'
+      : '';
+  }
+  const fxWs = document.querySelector('#pane-effects .fx-workspace');
+  if (fxWs) fxWs.classList.toggle('is-dmx-pixels', pixel);
+  const fxHint = document.getElementById('fxPreviewHint');
+  /* Preview stays active; hint updated while drawing */
+
+  const ucntEl = document.getElementById('ucnt');
+  const ucntHint = document.getElementById('ucntHint');
+  const leds = Math.max(1, totalPixels());
+  const ch = dmxChannelsPerPixel();
+  const needU = dmxUniversesNeeded(leds, ch);
+  const startU = +(document.getElementById('universe')?.value || 0) | 0;
+  if (pixel) {
+    if (ucntEl) {
+      ucntEl.value = String(needU);
+      ucntEl.readOnly = true;
+      ucntEl.title = 'Set automatically from light count × color channels';
+    }
+    if (ucntHint) {
+      ucntHint.hidden = false;
+      ucntHint.textContent = leds + ' lights × ' + ch + ' ch = ' + (leds * ch)
+        + ' channels → universes ' + startU + '–' + (startU + needU - 1)
+        + ' (512 ch each)';
+    }
+    const mapHelp = document.getElementById('ctlPixelMapHelp');
+    if (mapHelp) {
+      const chNames = ch === 4 ? 'R,G,B,W' : 'R,G,B';
+      mapHelp.textContent = 'LED 0 uses channels 1–' + ch + ' (' + chNames
+        + ') on universe ' + startU + '. Mapping continues across consecutive universes until all '
+        + leds + ' lights are covered (' + needU + ' universe' + (needU === 1 ? '' : 's') + ').';
+    }
+  } else {
+    if (ucntEl) {
+      ucntEl.readOnly = false;
+      ucntEl.title = '';
+    }
+    if (ucntHint) ucntHint.hidden = true;
+  }
+  syncCtlModVisibility();
+}
+
+let _dmxRgb = null; /* Uint8Array RGB triplets from device */
+let _dmxActive = false;
+let _dmxPollAt = 0;
+async function pollDmxPreview(force){
+  if (!dmxPixelMode()) {
+    _dmxRgb = null;
+    _dmxActive = false;
+    return;
+  }
+  const now = performance.now();
+  if (!force && now - _dmxPollAt < 80) return;
+  _dmxPollAt = now;
+  try {
+    const r = await fetch('/api/dmx.bin', { credentials: 'same-origin', headers: apiHeaders() });
+    if (!r.ok) return;
+    _dmxActive = r.headers.get('X-PM-Dmx-Active') === '1';
+    const buf = new Uint8Array(await r.arrayBuffer());
+    if (buf.length >= 3) _dmxRgb = buf;
+  } catch (_) {}
+}
+function sampleDmxRgb(i, count){
+  if (!_dmxRgb || _dmxRgb.length < 3) return null;
+  const n = Math.floor(_dmxRgb.length / 3);
+  if (i < 0 || i >= n) return [0, 0, 0];
+  const o = i * 3;
+  return [_dmxRgb[o], _dmxRgb[o + 1], _dmxRgb[o + 2]];
+}
+function previewPixelRgb(id, en, tSec, inten, i, count){
+  if (dmxPixelMode()) {
+    const rgb = sampleDmxRgb(i, count);
+    if (rgb) return rgb;
+    return [0, 0, 0];
+  }
+  return evalEffect(id, en.x, en.y, en.z, tSec, inten, i, count);
 }
 function fxModsAllowed(){
   return !dmxNetEnabled();
@@ -1714,10 +1962,14 @@ function collectConfig(){
     apssid:(document.getElementById('apssid')?.value || '').trim(),
     webAuth:!!document.getElementById('webAuth')?.checked,
     gpio:+gpio.value, clk:+clk.value, sled:+sled.value, sledh:sledh.checked,
+    board:(document.getElementById('boardId')?.value || '').trim(),
     count:total, scnt:stripCount(), slens, sgpios,
     bri:+bri.value, gamma:+gamma.value, aw:!!aw.checked,
     chip:chip.value, order:order.value, fx:+fx.value, ...fxc,
-    aun:+universe.value | 0, sun:+universe.value | 0, ucnt:+ucnt.value | 0,
+    aun:+universe.value | 0, sun:+universe.value | 0,
+    ucnt: dmxPixelMode()
+      ? dmxUniversesNeeded(total, dmxChannelsPerPixel())
+      : (+ucnt.value | 0),
     aen:!!aen.checked, sen:!!sen.checked && !aen.checked,
     sminp:+(document.getElementById('sminp')?.value || 0) | 0,
     maled:+(document.getElementById('maled')?.value || 60) | 0,
@@ -2358,6 +2610,11 @@ async function loadCfg(){
   if (mdnsHint) mdnsHint.textContent = c.host || 'pixelmap';
   refreshWifiStatus();
   if (document.getElementById('otaPart')) otaPart.textContent = c.otaPart || '—';
+  if (document.getElementById('mcu') && c.mcu) mcu.value = c.mcu;
+  if (c.mcu) boardsMcu = c.mcu;
+  const boardIdEl = document.getElementById('boardId');
+  if (boardIdEl) boardIdEl.value = c.board || '';
+  populateBoardSelect(c.board || '');
   if (document.getElementById('maled')) maled.value = c.maled != null ? c.maled : 60;
   if (document.getElementById('maxma')) maxma.value = c.maxma != null ? c.maxma : 0;
   if (document.getElementById('sminp')) sminp.value = c.sminp != null ? c.sminp : 0;
@@ -2383,6 +2640,7 @@ async function loadCfg(){
   universe.value = (c.aun != null ? c.aun : c.sun) ?? 0;
   ucnt.value = c.ucnt != null ? c.ucnt : 4;
   syncCtlModVisibility();
+  syncDmxPixelUi();
   mw.value=c.mw||10; mh.value=c.mh||6; md.value=c.md||1; mdim.value=String(c.mdim??0);
   mlay.value=String(c.mlay??0); mfill.value=String(c.mfill??0); mopentb.checked=!!c.mopentb; mspc.value=fmt1(c.mspc??1);
   pove.checked=!!c.pove; povm.value=String(c.povm??1); poyl.value=String(c.poyl??1);
@@ -4151,7 +4409,7 @@ function stampPovLeds(tctx, m, nLed, id, motionMs, effectT, inten, dotR, alpha){
   for (let i = 0; i < nLed; i++) {
     const wpos = povWorldPos(i, nLed, motionMs);
     const e = povEffectPos(wpos);
-    const [r, g, b] = evalEffect(id, e.x, e.y, 0, effectT, inten, i, nLed);
+    const [r, g, b] = previewPixelRgb(id, e, effectT, inten, i, nLed);
     if (r + g + b < 8) continue;
     const p = povWorldToScreen(m, wpos.x, wpos.y);
     tctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
@@ -4305,6 +4563,8 @@ function drawFxPreview(ts){
   ctx.fillStyle = '#0a0e0c';
   ctx.fillRect(0, 0, w, h);
 
+  if (dmxPixelMode()) pollDmxPreview(false);
+
   const id = +fx.value;
   const timeMs = ts || 0;
   fxRenderState = fxComputeLive(timeMs);
@@ -4335,7 +4595,10 @@ function drawFxPreview(ts){
   if (lay === 3) shapeLabel += (+mfill.value === 1 ? ' · filled' : (mopentb.checked ? ' · open top/bottom' : ' · outside only'));
   if (lay === 4) shapeLabel += mopentb.checked ? ' · open top/bottom' : ' · capped';
   let hint = shapeLabel + ' · ' + samples.length + ' lights · spacing ' + sp;
-  if ((id|0) === 25) {
+  if (dmxPixelMode()) {
+    hint = 'Each LED color (DMX) · ' + samples.length + ' lights · '
+      + (_dmxActive ? 'live stream' : 'waiting for Art-Net / sACN');
+  } else if ((id|0) === 25) {
     ensureLuaPreview();
     hint += _luaErr ? (' · script preview error: ' + _luaErr) : ' · custom script';
   }
@@ -4351,17 +4614,17 @@ function drawFxPreview(ts){
     samples.forEach((p, i) => {
       const v = toViewUnit(p, cam);
       const en = worldToEffectNorm(p);
-      const [r, g, bcol] = evalEffect(id, en.x, en.y, en.z, tSec, inten, i, samples.length);
+      const [r, g, bcol] = previewPixelRgb(id, en, tSec, inten, i, samples.length);
       const { x, y } = viewToCanvasXY(v, w, h);
       ctx.fillStyle = fxFillStyle(r, g, bcol);
       ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
     });
     ctx.fillStyle = '#8aa093';
     ctx.font = '12px sans-serif';
-    const fillNote = lay === 1
+    const fillNote = dmxPixelMode() ? '' : (lay === 1
       ? ((+mfill.value === 1 ? 'Filled disk' : 'Concentric rings') + ' · ')
-      : '';
-    ctx.fillText(fillNote + 'spacing ' + sp, 12, 18);
+      : '');
+    ctx.fillText(fillNote + (dmxPixelMode() ? (_dmxActive ? 'Live DMX' : 'No stream') : ('spacing ' + sp)), 12, 18);
   } else {
     if (fx3dAuto.checked && !fxOrbit.dragging) {
       const last = drawFxPreview._lastTs || ts || 0;
@@ -4377,7 +4640,7 @@ function drawFxPreview(ts){
 
     const drawn = samples.map((p, i) => {
       const en = worldToEffectNorm(p);
-      const [r, g, b] = evalEffect(id, en.x, en.y, en.z, tSec, inten, i, samples.length);
+      const [r, g, b] = previewPixelRgb(id, en, tSec, inten, i, samples.length);
       const v = toViewUnit(p, cam);
       const pr = projectPoint(v.x, v.y, v.z, yaw, pitch, zoom, w, h);
       return { pr, r, g, b };
@@ -4392,7 +4655,7 @@ function drawFxPreview(ts){
 
     ctx.fillStyle = '#8aa093';
     ctx.font = '12px sans-serif';
-    ctx.fillText(shapeLayoutName() + ' · spacing ' + sp, 12, 18);
+    ctx.fillText(dmxPixelMode() ? (_dmxActive ? 'Live DMX' : 'Waiting for stream') : (shapeLayoutName() + ' · spacing ' + sp), 12, 18);
   }
 
   applyLiveToFxSliders(fxRenderState);
@@ -4529,6 +4792,8 @@ function drawDashPreview(ts){
     drawDashPreview._lastTs = ts || 0;
   }
 
+  if (dmxPixelMode()) pollDmxPreview(false);
+
   const samples = (typeof fxSamplePoints === 'function') ? fxSamplePoints() : [];
   if (!samples.length) {
     ctx.fillStyle = '#8aa093';
@@ -4543,7 +4808,7 @@ function drawDashPreview(ts){
   const cam = previewCamFromPoints(samples);
   const drawn = samples.map((p, i) => {
     const en = worldToEffectNorm(p);
-    const [r, g, b] = evalEffect(id, en.x, en.y, en.z, tSec, inten, i, samples.length);
+    const [r, g, b] = previewPixelRgb(id, en, tSec, inten, i, samples.length);
     const v = toViewUnit(p, cam);
     const pr = projectPoint(v.x, v.y, v.z, yaw, pitch, zoom, w, h);
     return { pr, r, g, b };
@@ -4672,20 +4937,33 @@ document.querySelectorAll('[data-bs-toggle="tab"]').forEach(btn=>{
 });
 aen.addEventListener('change', () => {
   syncDmxProtocolExclusive('aen');
+  syncDmxPixelUi();
   applyLiveToFxSliders();
   if (fxTabActive) startFxAnim();
   scheduleFxPush();
 });
 sen.addEventListener('change', () => {
   syncDmxProtocolExclusive('sen');
+  syncDmxPixelUi();
   applyLiveToFxSliders();
   if (fxTabActive) startFxAnim();
   scheduleFxPush();
 });
 dmxmode.addEventListener('change', () => {
+  syncDmxPixelUi();
   applyLiveToFxSliders();
   if (fxTabActive) startFxAnim();
+  else if (dashTabActive) startDashAnim();
   scheduleFxPush();
+});
+document.getElementById('chip')?.addEventListener('change', () => {
+  if (dmxPixelMode()) syncDmxPixelUi();
+});
+document.getElementById('scnt')?.addEventListener('change', () => {
+  if (dmxPixelMode()) syncDmxPixelUi();
+});
+document.getElementById('universe')?.addEventListener('input', () => {
+  if (dmxPixelMode()) syncDmxPixelUi();
 });
 
 /* ---- Map formula helpers (browser-side JS) ---- */
@@ -5421,7 +5699,22 @@ saveMap.onclick=async()=>{
 rebuildStripLenFields([60], [DEFAULT_STRIP_GPIOS[0]]);
 syncFxParamRows();
 syncCtlChannelRows();
-loadCfg().then(() => {
+document.getElementById('boardSel')?.addEventListener('change', () => {
+  updateBoardNotes();
+  const id = document.getElementById('boardSel')?.value || '';
+  const boardEl = document.getElementById('boardId');
+  if (boardEl && !id) boardEl.value = '';
+});
+document.getElementById('boardApply')?.addEventListener('click', () => {
+  const id = document.getElementById('boardSel')?.value;
+  const b = findBoard(id) || defaultBoardForMcu();
+  if (!b) {
+    setStatus(statusStrip, false, 'No board profiles loaded');
+    return;
+  }
+  applyBoardProfile(b, { saveHint: true });
+});
+loadBoardsCatalog().then(() => loadCfg()).then(() => {
   loadMap();
   refreshWifiStatus();
   dashTabActive = true;

@@ -1,0 +1,23 @@
+{
+  "id": "wled_esp32_eth",
+  "name": "ESP32 + Ethernet (data on GPIO 4)",
+  "mcu": "esp32",
+  "default": false,
+  "pins": {
+    "led_data": [4, 16, 2, 13, 14, 15, 18, 19],
+    "led_clock": 14,
+    "status_led": 2,
+    "status_led_active_high": true,
+    "button": 0,
+    "audio_ws": 15,
+    "audio_sck": 32,
+    "audio_sd": 33
+  },
+  "notes": "Keeps LED data off pins commonly claimed by LAN8720 Ethernet. Audio BCLK moved off GPIO 14 to reduce clock conflicts.",
+  "defaults": {
+    "chipset": "WS2812B",
+    "color_order": "GRB",
+    "pixel_count": 60,
+    "max_ma": 4000
+  }
+}

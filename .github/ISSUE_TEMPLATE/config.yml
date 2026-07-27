@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: PixelMap README & flashing guide
+    url: https://github.com/NicholasTracy/pixelmap#readme
+    about: Install, flash, SoftAP setup, and local UI preview — start here before filing an issue.
+  - name: Architecture notes
+    url: https://github.com/NicholasTracy/pixelmap/blob/main/docs/ARCHITECTURE.md
+    about: How firmware, web UI, mapping, and DMX fit together.
+  - name: Security tips
+    url: https://github.com/NicholasTracy/pixelmap/blob/main/docs/SECURITY.md
+    about: Passwords, SoftAP, and network exposure recommendations.

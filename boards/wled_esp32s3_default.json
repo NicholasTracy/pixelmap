@@ -1,0 +1,23 @@
+{
+  "id": "wled_esp32s3_default",
+  "name": "WLED ESP32-S3 default",
+  "mcu": "esp32s3",
+  "default": true,
+  "pins": {
+    "led_data": [16, 21, 38, 39, 40, 41, 42, 1],
+    "led_clock": 14,
+    "status_led": 48,
+    "status_led_active_high": true,
+    "button": 0,
+    "audio_ws": 4,
+    "audio_sck": 5,
+    "audio_sd": 6
+  },
+  "notes": "ESP32-S3 friendly data pins (avoids USB-JTAG straps where possible). Status LED defaults to GPIO 48 (common on S3 DevKits); set to −1 if your board has no onboard LED.",
+  "defaults": {
+    "chipset": "WS2812B",
+    "color_order": "GRB",
+    "pixel_count": 60,
+    "max_ma": 4000
+  }
+}

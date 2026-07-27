@@ -32,6 +32,13 @@ jobs:
             test -f "$f" || { echo "missing: $f"; exit 1; }
           done
 
+      - name: Verify board catalog
+        run: |
+          set -euo pipefail
+          python3 tools/gen_boards_catalog.py
+          test -f boards/catalog.json
+          python3 -c "import json; d=json.load(open('boards/catalog.json')); assert d.get('boards'), 'no boards'"
+
       - name: Verify components exist
         run: |
           set -euo pipefail

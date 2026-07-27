@@ -123,6 +123,8 @@ extern const uint8_t bootstrap_js_start[] asm("_binary_bootstrap_bundle_min_js_s
 extern const uint8_t bootstrap_js_end[] asm("_binary_bootstrap_bundle_min_js_end");
 extern const uint8_t pixelmap_logo_png_start[] asm("_binary_PixelMapLogo_png_start");
 extern const uint8_t pixelmap_logo_png_end[] asm("_binary_PixelMapLogo_png_end");
+extern const uint8_t catalog_json_start[] asm("_binary_catalog_json_start");
+extern const uint8_t catalog_json_end[] asm("_binary_catalog_json_end");
 
 static esp_err_t send_json(httpd_req_t *req, cJSON *obj)
 {
@@ -334,6 +336,24 @@ static esp_err_t h_logo_png(httpd_req_t *req)
                            pixelmap_logo_png_end - pixelmap_logo_png_start);
 }
 
+static esp_err_t h_get_boards(httpd_req_t *req)
+{
+    if (!auth_ok(req, false)) return reject_pin(req);
+    size_t n = (size_t)(catalog_json_end - catalog_json_start);
+    char *buf = malloc(n + 1);
+    if (!buf) return ESP_ERR_NO_MEM;
+    memcpy(buf, catalog_json_start, n);
+    buf[n] = '\0';
+    cJSON *root = cJSON_Parse(buf);
+    free(buf);
+    if (!root) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "boards catalog");
+        return ESP_FAIL;
+    }
+    cJSON_AddStringToObject(root, "mcu", pm_config_mcu_target());
+    return send_json(req, root);
+}
+
 static esp_err_t h_get_config(httpd_req_t *req)
 {
     if (!auth_ok(req, false)) return reject_pin(req);
@@ -356,6 +376,8 @@ static esp_err_t h_get_config(httpd_req_t *req)
     cJSON_AddStringToObject(o, "apssid", c->ap_ssid);
     cJSON_AddBoolToObject(o, "apPassSet", c->ap_pass[0] != '\0');
     cJSON_AddStringToObject(o, "host", c->hostname);
+    cJSON_AddStringToObject(o, "mcu", pm_config_mcu_target());
+    cJSON_AddStringToObject(o, "board", c->board_id);
     cJSON_AddStringToObject(o, "otaPart", pm_ota_running_label());
     cJSON_AddNumberToObject(o, "maled", c->ma_per_led);
     cJSON_AddNumberToObject(o, "maxma", c->max_ma);
@@ -433,6 +455,17 @@ static esp_err_t h_get_config(httpd_req_t *req)
         cJSON_AddItemToObject(o, "fxmod", fmod);
     }
     cJSON_AddNumberToObject(o, "dmxmode", (int)c->dmx_mode);
+    {
+        const pm_chipset_timing_t *tim = pm_chipset_timing(c->chipset);
+        uint8_t ch = (tim && tim->channels >= 4) ? 4 : 3;
+        cJSON_AddNumberToObject(o, "dmxch", ch);
+        size_t need = (size_t)c->pixel_count * (size_t)ch;
+        uint16_t need_u = need ? (uint16_t)((need + 511u) / 512u) : 1;
+        if (need_u < 1) need_u = 1;
+        if (need_u > 16) need_u = 16;
+        cJSON_AddNumberToObject(o, "dmxNeedU", need_u);
+        cJSON_AddNumberToObject(o, "dmxChannels", (double)need);
+    }
     cJSON_AddNumberToObject(o, "fxmask", (double)pm_effect_param_mask(c->effect_id));
     cJSON_AddNumberToObject(o, "aun", c->artnet_universe);
     cJSON_AddNumberToObject(o, "sun", c->sacn_universe);
@@ -479,6 +512,10 @@ static esp_err_t h_post_config(httpd_req_t *req)
     }
     if ((v = cJSON_GetObjectItem(j, "host")) && cJSON_IsString(v))
         strncpy(c->hostname, v->valuestring, sizeof(c->hostname) - 1);
+    if ((v = cJSON_GetObjectItem(j, "board")) && cJSON_IsString(v)) {
+        strncpy(c->board_id, v->valuestring, sizeof(c->board_id) - 1);
+        c->board_id[sizeof(c->board_id) - 1] = '\0';
+    }
     if ((v = cJSON_GetObjectItem(j, "apen"))) c->ap_enable = cJSON_IsTrue(v);
     if ((v = cJSON_GetObjectItem(j, "apfb"))) c->ap_fallback = cJSON_IsTrue(v);
     if ((v = cJSON_GetObjectItem(j, "apssid")) && cJSON_IsString(v)) {
@@ -704,6 +741,17 @@ static esp_err_t h_post_config(httpd_req_t *req)
         if (uv < 1) uv = 1;
         if (uv > 16) uv = 16;
         c->universe_count = (uint16_t)uv;
+    }
+    /* Each-LED mode: auto-pack pixels across universes (512 ch each). */
+    if (c->dmx_mode == PM_DMX_MODE_PIXELS) {
+        pm_config_sync_strips(c);
+        const pm_chipset_timing_t *tim = pm_chipset_timing(c->chipset);
+        uint8_t ch = (tim && tim->channels >= 4) ? 4 : 3;
+        size_t need = (size_t)c->pixel_count * (size_t)ch;
+        uint16_t uv = need ? (uint16_t)((need + 511u) / 512u) : 1;
+        if (uv < 1) uv = 1;
+        if (uv > 16) uv = 16;
+        c->universe_count = uv;
     }
     if ((v = cJSON_GetObjectItem(j, "sminp")) && cJSON_IsNumber(v)) {
         int p = (int)v->valuedouble;
@@ -1474,12 +1522,61 @@ static esp_err_t h_get_audio(httpd_req_t *req)
     return send_json(req, o);
 }
 
+static esp_err_t h_get_dmx(httpd_req_t *req)
+{
+    if (!auth_ok(req, false)) return reject_pin(req);
+    pm_app_config_t *c = s_hooks.cfg;
+    const pm_chipset_timing_t *tim = pm_chipset_timing(c->chipset);
+    uint8_t ch = (tim && tim->channels >= 4) ? 4 : 3;
+    bool active = false;
+    if (s_hooks.dmx_rgb_snapshot) {
+        s_hooks.dmx_rgb_snapshot(NULL, 0, &active);
+    }
+    size_t need = (size_t)c->pixel_count * (size_t)ch;
+    uint16_t need_u = need ? (uint16_t)((need + 511u) / 512u) : 1;
+    if (need_u < 1) need_u = 1;
+    if (need_u > 16) need_u = 16;
+    cJSON *o = cJSON_CreateObject();
+    cJSON_AddBoolToObject(o, "ok", true);
+    cJSON_AddBoolToObject(o, "active", active);
+    cJSON_AddNumberToObject(o, "mode", (int)c->dmx_mode);
+    cJSON_AddNumberToObject(o, "ch", ch);
+    cJSON_AddNumberToObject(o, "pixels", c->pixel_count);
+    cJSON_AddNumberToObject(o, "channels", (double)need);
+    cJSON_AddNumberToObject(o, "startUni", c->artnet_universe);
+    cJSON_AddNumberToObject(o, "universes", c->universe_count);
+    cJSON_AddNumberToObject(o, "needUniverses", need_u);
+    return send_json(req, o);
+}
+
+static esp_err_t h_get_dmx_bin(httpd_req_t *req)
+{
+    if (!auth_ok(req, false)) return reject_pin(req);
+    if (!s_hooks.dmx_rgb_snapshot) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "no dmx");
+        return ESP_FAIL;
+    }
+    size_t cap = (size_t)s_hooks.cfg->pixel_count * 3u;
+    if (cap == 0) cap = 3;
+    if (cap > 4096u * 3u) cap = 4096u * 3u;
+    uint8_t *buf = malloc(cap);
+    if (!buf) return ESP_ERR_NO_MEM;
+    bool active = false;
+    size_t n = s_hooks.dmx_rgb_snapshot(buf, cap, &active);
+    httpd_resp_set_type(req, "application/octet-stream");
+    httpd_resp_set_hdr(req, "X-PM-Dmx-Active", active ? "1" : "0");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    esp_err_t err = httpd_resp_send(req, (const char *)buf, n * 3);
+    free(buf);
+    return err;
+}
+
 esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
 {
     if (!hooks || !hooks->cfg || !hooks->map) return ESP_ERR_INVALID_ARG;
     s_hooks = *hooks;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 48;
+    config.max_uri_handlers = 52;
     config.stack_size = 10240;
     ESP_RETURN_ON_ERROR(httpd_start(&s_server, &config), TAG, "httpd");
 
@@ -1498,6 +1595,7 @@ esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
         {.uri = "/api/wifi/scan", .method = HTTP_GET, .handler = h_get_wifi_scan},
         {.uri = "/api/config", .method = HTTP_GET, .handler = h_get_config},
         {.uri = "/api/config", .method = HTTP_POST, .handler = h_post_config},
+        {.uri = "/api/boards", .method = HTTP_GET, .handler = h_get_boards},
         {.uri = "/api/map", .method = HTTP_GET, .handler = h_get_map},
         {.uri = "/api/map", .method = HTTP_POST, .handler = h_post_map},
         {.uri = "/api/map/grid", .method = HTTP_POST, .handler = h_post_grid},
@@ -1514,6 +1612,8 @@ esp_err_t pm_web_ui_start(const pm_web_ui_hooks_t *hooks)
         {.uri = "/api/factory_reset", .method = HTTP_POST, .handler = h_post_factory_reset},
         {.uri = "/api/reboot", .method = HTTP_POST, .handler = h_post_reboot},
         {.uri = "/api/audio", .method = HTTP_GET, .handler = h_get_audio},
+        {.uri = "/api/dmx", .method = HTTP_GET, .handler = h_get_dmx},
+        {.uri = "/api/dmx.bin", .method = HTTP_GET, .handler = h_get_dmx_bin},
     };
     for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); ++i) {
         httpd_register_uri_handler(s_server, &routes[i]);

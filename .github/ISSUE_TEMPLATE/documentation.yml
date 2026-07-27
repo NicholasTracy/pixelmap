@@ -1,0 +1,37 @@
+name: Documentation
+description: Report unclear, missing, or incorrect docs (README, boards notes, or in-app help).
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: Help us keep the README, board notes, and UI copy clear for newcomers.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where is the problem?
+      options:
+        - README
+        - boards/ README or pin JSON
+        - docs/ (Architecture, Security, Roadmap)
+        - In-app help / labels
+        - Issue / PR templates
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Page or file link
+      placeholder: "https://github.com/NicholasTracy/pixelmap/blob/main/README.md"
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is wrong or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested improvement
+      description: Optional wording or structure you would prefer.

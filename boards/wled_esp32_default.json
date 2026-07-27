@@ -1,18 +1,19 @@
 {
-  "name": "WLED ESP32 Default",
-  "chip": "esp32",
+  "id": "wled_esp32_default",
+  "name": "WLED ESP32 default",
+  "mcu": "esp32",
+  "default": true,
   "pins": {
-    "led_data_1": 16,
-    "led_data_2": -1,
+    "led_data": [16, 2, 4, 13, 14, 15, 18, 19],
     "led_clock": 14,
-    "button": 0,
     "status_led": 2,
+    "status_led_active_high": true,
+    "button": 0,
     "audio_ws": 15,
     "audio_sck": 14,
     "audio_sd": 32
   },
-  "audio_notes": "INMP441 I2S defaults match the Audio tab. If using APA102, move BCLK off GPIO 14 (shared with LED clock).",
-  "status_led_notes": "GPIO 2 is the ESP32 DevKit onboard LED used by many WLED boards. Disabled automatically if the same pin is chosen for LED data.",
+  "notes": "Classic WLED-style ESP32 DevKit layout. Status LED shares GPIO 2 with many onboard LEDs. If using APA102, move BCLK (audio_sck) off GPIO 14 when that pin is the LED clock.",
   "defaults": {
     "chipset": "WS2812B",
     "color_order": "GRB",

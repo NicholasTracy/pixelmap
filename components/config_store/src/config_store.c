@@ -3,6 +3,7 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_log.h"
+#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include <math.h>
@@ -93,15 +94,42 @@ static uint8_t fxmod_u8(float v)
 
 #define NS "pixelmap"
 
-/* Common WLED / ESP32 multi-output data pins (safe-ish defaults; custom OK in UI). */
+/* Pin defaults mirror boards/wled_esp32_default.json / wled_esp32s3_default.json */
+#if CONFIG_IDF_TARGET_ESP32S3
+static const int k_default_strip_gpio[PM_STRIP_MAX] = {
+    16, 21, 38, 39, 40, 41, 42, 1
+};
+static const int k_default_clock = 14;
+static const int k_default_status_led = 48;
+static const int k_default_audio_ws = 4;
+static const int k_default_audio_sck = 5;
+static const int k_default_audio_sd = 6;
+static const char *k_default_board_id = "wled_esp32s3_default";
+#else
 static const int k_default_strip_gpio[PM_STRIP_MAX] = {
     16, 2, 4, 13, 14, 15, 18, 19
 };
+static const int k_default_clock = 14;
+static const int k_default_status_led = 2;
+static const int k_default_audio_ws = 15;
+static const int k_default_audio_sck = 14;
+static const int k_default_audio_sd = 32;
+static const char *k_default_board_id = "wled_esp32_default";
+#endif
 
 int pm_config_default_strip_gpio(uint8_t strip_index)
 {
     if (strip_index >= PM_STRIP_MAX) strip_index = PM_STRIP_MAX - 1;
     return k_default_strip_gpio[strip_index];
+}
+
+const char *pm_config_mcu_target(void)
+{
+#ifdef CONFIG_IDF_TARGET
+    return CONFIG_IDF_TARGET;
+#else
+    return "esp32";
+#endif
 }
 
 void pm_config_set_defaults(pm_app_config_t *cfg)
@@ -116,9 +144,10 @@ void pm_config_set_defaults(pm_app_config_t *cfg)
     cfg->web_auth = false;
     cfg->web_pass[0] = '\0';
     cfg->web_pass_rotate = false;
+    strncpy(cfg->board_id, k_default_board_id, sizeof(cfg->board_id) - 1);
     cfg->gpio_data = pm_config_default_strip_gpio(0);
-    cfg->gpio_clock = 14;
-    cfg->gpio_status_led = 2; /* ESP32 DevKit / common WLED onboard LED */
+    cfg->gpio_clock = k_default_clock;
+    cfg->gpio_status_led = k_default_status_led;
     cfg->status_led_active_high = true;
     cfg->chipset = PM_CHIPSET_WS2812B;
     cfg->color_order = PM_COLOR_ORDER_GRB;
@@ -171,9 +200,9 @@ void pm_config_set_defaults(pm_app_config_t *cfg)
     cfg->ma_per_led = 60;
     cfg->max_ma = 0; /* 0 = unlimited until the user sets a limit */
     cfg->audio_enable = false;
-    cfg->audio_gpio_ws = 15;
-    cfg->audio_gpio_sck = 14;
-    cfg->audio_gpio_sd = 32;
+    cfg->audio_gpio_ws = k_default_audio_ws;
+    cfg->audio_gpio_sck = k_default_audio_sck;
+    cfg->audio_gpio_sd = k_default_audio_sd;
     cfg->audio_gain = 128;
     cfg->audio_squelch = 20;
     cfg->audio_modulate = false;
@@ -410,6 +439,8 @@ esp_err_t pm_config_load(pm_app_config_t *cfg)
     nvs_get_str(h, "pass", cfg->sta_pass, &len);
     len = sizeof(cfg->hostname);
     nvs_get_str(h, "host", cfg->hostname, &len);
+    len = sizeof(cfg->board_id);
+    nvs_get_str(h, "board", cfg->board_id, &len);
     if (nvs_get_i32(h, "apen", &v) == ESP_OK) cfg->ap_enable = v != 0;
     if (nvs_get_i32(h, "apfb", &v) == ESP_OK) cfg->ap_fallback = v != 0;
     len = sizeof(cfg->ap_ssid);
@@ -653,6 +684,7 @@ esp_err_t pm_config_save(const pm_app_config_t *cfg)
     nvs_set_str(h, "ssid", cfg->sta_ssid);
     nvs_set_str(h, "pass", cfg->sta_pass);
     nvs_set_str(h, "host", cfg->hostname);
+    nvs_set_str(h, "board", cfg->board_id);
     nvs_set_i32(h, "apen", cfg->ap_enable ? 1 : 0);
     nvs_set_i32(h, "apfb", cfg->ap_fallback ? 1 : 0);
     nvs_set_str(h, "apssid", cfg->ap_ssid);

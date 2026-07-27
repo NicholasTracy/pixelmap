@@ -1,0 +1,50 @@
+name: Feature request
+description: Suggest a new capability or improvement for PixelMap.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome. Please check open issues and the [README](https://github.com/NicholasTracy/pixelmap#readme) first so we can avoid duplicates.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or goal
+      description: What are you trying to do that is hard or impossible today?
+      placeholder: I want to…
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should PixelMap behave if this existed?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Other controllers, workarounds, or UI/API shapes you thought about.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Web UI / setup
+        - LED hardware / boards
+        - Effects / Motion / Map
+        - Art-Net / sACN
+        - Audio
+        - Networking / security
+        - Performance / memory
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: extras
+    attributes:
+      label: Extra context
+      description: Board, LED count, lighting software, or sketches this would help.

@@ -171,8 +171,9 @@ You can change pins in the UI. The status LED “breathes” differently for boo
 ## More help
 
 - [Releases](https://github.com/NicholasTracy/pixelmap/releases/latest)
+- [Report a bug, request a feature, or ask a question](https://github.com/NicholasTracy/pixelmap/issues/new/choose)
 - [Security tips (short)](docs/SECURITY.md)
-- [Board pin notes](boards/README.md)
+- [Board pin profiles](boards/README.md) — add a JSON file, run `python tools/gen_boards_catalog.py`, then pick the board in **LED lights**
 
 ---
 

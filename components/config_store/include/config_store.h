@@ -87,6 +87,8 @@ typedef struct {
     int gpio_clock;
     int gpio_status_led;      /* WLED-style onboard status LED; <0 disables */
     bool status_led_active_high;
+    /** Last applied boards/*.json id (empty = custom / unknown). */
+    char board_id[40];
     pm_chipset_t chipset;
     pm_color_order_t color_order;
     uint16_t pixel_count;           /* total LEDs = sum of strip_len[0..strip_count) */
@@ -176,6 +178,8 @@ void pm_config_set_defaults(pm_app_config_t *cfg);
 esp_err_t pm_config_factory_reset_nvs(void);
 /** WLED-friendly default data GPIO for strip index (0-based). */
 int pm_config_default_strip_gpio(uint8_t strip_index);
+/** Build target string: "esp32", "esp32s3", … (from CONFIG_IDF_TARGET). */
+const char *pm_config_mcu_target(void);
 /** Clamp strip_count / lengths / GPIOs; pixel_count = sum(strip_len); gpio_data = strip_gpio[0]. */
 void pm_config_sync_strips(pm_app_config_t *cfg);
 

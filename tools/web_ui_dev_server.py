@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 UI_DIR = ROOT / "components" / "web_ui"
 INDEX = UI_DIR / "index.html"
 LOGO = ROOT / "docs" / "PixelMapLogo.png"
+BOARDS_DIR = ROOT / "boards"
+BOARDS_CATALOG = BOARDS_DIR / "catalog.json"
 
 HOST = "127.0.0.1"
 PORT = 8080
@@ -23,6 +25,8 @@ CONFIG = {
     "ssid": "StudioWiFi",
     "pass": "dev-secret",
     "host": "pixelmap-dev",
+    "mcu": "esp32",
+    "board": "wled_esp32_default",
     "apen": True,
     "apfb": False,
     "apssid": "",
@@ -572,6 +576,25 @@ MEDIA_MAX_H = 96
 MEDIA_MAX_FRAMES = 8
 
 
+def _load_boards_catalog() -> dict:
+    if BOARDS_CATALOG.is_file():
+        try:
+            data = json.loads(BOARDS_CATALOG.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and isinstance(data.get("boards"), list):
+                return data
+        except json.JSONDecodeError:
+            pass
+    boards = []
+    for path in sorted(BOARDS_DIR.glob("*.json")):
+        if path.name == "catalog.json":
+            continue
+        try:
+            boards.append(json.loads(path.read_text(encoding="utf-8")))
+        except json.JSONDecodeError:
+            continue
+    return {"version": 1, "boards": boards}
+
+
 def _media_meta():
     import struct
 
@@ -686,6 +709,60 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/media":
             self._json(200, _media_meta())
             return
+        if path == "/api/boards":
+            cat = _load_boards_catalog()
+            cat["mcu"] = CONFIG.get("mcu") or "esp32"
+            self._json(200, cat)
+            return
+        if path == "/api/dmx":
+            count = int(CONFIG.get("count") or 60)
+            chip = str(CONFIG.get("chip") or "WS2812B")
+            ch = 4 if ("SK6812" in chip.upper() or "TM1814" in chip.upper() or "RGBW" in chip.upper()) else 3
+            need = count * ch
+            need_u = max(1, min(16, (need + 511) // 512))
+            mode = int(CONFIG.get("dmxmode", 1) or 0)
+            self._json(
+                200,
+                {
+                    "ok": True,
+                    "active": mode == 0 and (CONFIG.get("aen") or CONFIG.get("sen")),
+                    "mode": mode,
+                    "ch": ch,
+                    "pixels": count,
+                    "channels": need,
+                    "startUni": int(CONFIG.get("aun") or 0),
+                    "universes": int(CONFIG.get("ucnt") or need_u),
+                    "needUniverses": need_u,
+                },
+            )
+            return
+        if path == "/api/dmx.bin":
+            count = int(CONFIG.get("count") or 60)
+            # Mock rainbow chase for preview when Each LED color is selected
+            import math
+            import time
+
+            t = time.time()
+            body = bytearray(count * 3)
+            for i in range(count):
+                hue = (i * 8 + int(t * 40)) % 256
+                # simple HSV-ish to RGB
+                h = hue / 43
+                f = h - int(h)
+                q = int(255 * (1 - f))
+                v = 180
+                hi = int(h) % 6
+                rgb = [(v, q, 0), (q, v, 0), (0, v, q), (0, q, v), (q, 0, v), (v, 0, q)][hi]
+                body[i * 3 : i * 3 + 3] = bytes(rgb)
+            active = "1" if int(CONFIG.get("dmxmode", 1) or 0) == 0 else "0"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("X-PM-Dmx-Active", active)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if path == "/api/media.bin":
             if len(MEDIA_BLOB) < 16:
                 self._json(404, {"error": "no media"})
@@ -770,6 +847,11 @@ class Handler(BaseHTTPRequestHandler):
             CONFIG["gpio"] = gpios[0]
             if "mfill" in CONFIG:
                 CONFIG["mfill"] = 1 if int(CONFIG["mfill"]) == 1 else 0
+            if int(CONFIG.get("dmxmode", 1) or 0) == 0:
+                chip = str(CONFIG.get("chip") or "WS2812B")
+                ch = 4 if ("SK6812" in chip.upper() or "TM1814" in chip.upper() or "RGBW" in chip.upper()) else 3
+                need = int(CONFIG["count"]) * ch
+                CONFIG["ucnt"] = max(1, min(16, (need + 511) // 512))
             self._json(200, {"ok": True, "note": "mock save (not flashed to a device)"})
             return
 
@@ -838,7 +920,7 @@ def main() -> None:
         raise SystemExit(f"UI not found: {INDEX}")
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"PixelMap web UI preview: http://{HOST}:{PORT}/")
-    print("Mock APIs: /api/config, /api/map, /api/map/grid, /api/fx/lua, /api/media  (Ctrl+C to stop)")
+    print("Mock APIs: /api/config, /api/map, /api/map/grid, /api/fx/lua, /api/media, /api/boards  (Ctrl+C to stop)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

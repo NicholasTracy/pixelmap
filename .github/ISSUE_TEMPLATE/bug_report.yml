@@ -1,0 +1,84 @@
+name: Bug report
+description: Something does not work as expected with PixelMap firmware or the web UI.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve PixelMap. Please skim the [README](https://github.com/NicholasTracy/pixelmap#readme) and existing issues first.
+        Put the firmware version in the title when you can (for example: `[Bug]: 0.2.0 Art-Net LEDs stay dark`).
+  - type: input
+    id: firmware-version
+    attributes:
+      label: Firmware version
+      description: Shown on the Home tab (or from the GitHub release / `VERSION` file you flashed).
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: mcu
+    attributes:
+      label: MCU / binary
+      options:
+        - ESP32 (classic)
+        - ESP32-S3
+        - Not sure
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: board
+    attributes:
+      label: Board / wiring
+      description: DevKit name, WLED-style board, or custom. Note LED data pin if known.
+      placeholder: "ESP32 DevKit · data GPIO 16 · WS2812B × 60"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it show up?
+      options:
+        - Web UI
+        - SoftAP / first-time setup
+        - Wi‑Fi / network
+        - LED strips / chipset
+        - Effects / Motion / Map
+        - Art-Net / sACN (Control)
+        - Audio
+        - OTA / update
+        - Build / flash / CI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe what you saw. Include UI error text or serial log snippets if you have them.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered list helps a lot.
+      placeholder: |
+        1. Flash release 0.2.0 for ESP32.
+        2. Join SoftAP and finish setup.
+        3. Open http://pixelmap.local/ → Control.
+        4. Enable Art-Net, Each LED color…
+    validations:
+      required: true
+  - type: textarea
+    id: extras
+    attributes:
+      label: Extra details
+      description: Screenshots, browser, LED count/chipset, Art-Net/sACN app, power supply notes, etc.
