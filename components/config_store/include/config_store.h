@@ -87,7 +87,7 @@ typedef struct {
     int gpio_clock;
     int gpio_status_led;      /* WLED-style onboard status LED; <0 disables */
     bool status_led_active_high;
-    /** Last applied boards/*.json id (empty = custom / unknown). */
+    /** Last applied board profile id from boards/ (empty = custom / unknown). */
     char board_id[40];
     pm_chipset_t chipset;
     pm_color_order_t color_order;
