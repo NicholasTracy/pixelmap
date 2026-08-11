@@ -114,17 +114,31 @@ static const char *SETUP_HTML =
     "e.textContent='Saved — opening UI…';location.href='/'};"
     "</script></body></html>";
 
-extern const uint8_t index_html_start[] asm("_binary_index_html_start");
-extern const uint8_t index_html_end[] asm("_binary_index_html_end");
-/* ESP-IDF EMBED_TXTFILES symbols use the basename only (not the vendor/ path). */
-extern const uint8_t bootstrap_css_start[] asm("_binary_bootstrap_min_css_start");
-extern const uint8_t bootstrap_css_end[] asm("_binary_bootstrap_min_css_end");
-extern const uint8_t bootstrap_js_start[] asm("_binary_bootstrap_bundle_min_js_start");
-extern const uint8_t bootstrap_js_end[] asm("_binary_bootstrap_bundle_min_js_end");
+extern const uint8_t index_html_gz_start[] asm("_binary_index_html_gz_start");
+extern const uint8_t index_html_gz_end[] asm("_binary_index_html_gz_end");
+/* ESP-IDF EMBED_FILES symbols use basename only (path separators → _). */
+extern const uint8_t bootstrap_css_gz_start[] asm("_binary_bootstrap_min_css_gz_start");
+extern const uint8_t bootstrap_css_gz_end[] asm("_binary_bootstrap_min_css_gz_end");
+extern const uint8_t bootstrap_js_gz_start[] asm("_binary_bootstrap_bundle_min_js_gz_start");
+extern const uint8_t bootstrap_js_gz_end[] asm("_binary_bootstrap_bundle_min_js_gz_end");
 extern const uint8_t pixelmap_logo_png_start[] asm("_binary_PixelMapLogo_png_start");
 extern const uint8_t pixelmap_logo_png_end[] asm("_binary_PixelMapLogo_png_end");
 extern const uint8_t catalog_json_start[] asm("_binary_catalog_json_start");
 extern const uint8_t catalog_json_end[] asm("_binary_catalog_json_end");
+
+static esp_err_t send_embed(httpd_req_t *req, const char *type,
+                            const uint8_t *start, const uint8_t *end,
+                            bool gzip, bool cache)
+{
+    httpd_resp_set_type(req, type);
+    if (gzip) {
+        httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    }
+    if (cache) {
+        httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=86400");
+    }
+    return httpd_resp_send(req, (const char *)start, end - start);
+}
 
 static esp_err_t send_json(httpd_req_t *req, cJSON *obj)
 {
@@ -307,33 +321,23 @@ static esp_err_t h_index(httpd_req_t *req)
     if (web_auth_enabled() && !session_ok(req)) {
         return reject_auth_page(req);
     }
-    httpd_resp_set_type(req, "text/html");
-    return httpd_resp_send(req, (const char *)index_html_start,
-                           index_html_end - index_html_start);
+    return send_embed(req, "text/html", index_html_gz_start, index_html_gz_end, true, false);
 }
 
 static esp_err_t h_bootstrap_css(httpd_req_t *req)
 {
-    httpd_resp_set_type(req, "text/css");
-    httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=86400");
-    return httpd_resp_send(req, (const char *)bootstrap_css_start,
-                           bootstrap_css_end - bootstrap_css_start);
+    return send_embed(req, "text/css", bootstrap_css_gz_start, bootstrap_css_gz_end, true, true);
 }
 
 static esp_err_t h_bootstrap_js(httpd_req_t *req)
 {
-    httpd_resp_set_type(req, "application/javascript");
-    httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=86400");
-    return httpd_resp_send(req, (const char *)bootstrap_js_start,
-                           bootstrap_js_end - bootstrap_js_start);
+    return send_embed(req, "application/javascript",
+                      bootstrap_js_gz_start, bootstrap_js_gz_end, true, true);
 }
 
 static esp_err_t h_logo_png(httpd_req_t *req)
 {
-    httpd_resp_set_type(req, "image/png");
-    httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=86400");
-    return httpd_resp_send(req, (const char *)pixelmap_logo_png_start,
-                           pixelmap_logo_png_end - pixelmap_logo_png_start);
+    return send_embed(req, "image/png", pixelmap_logo_png_start, pixelmap_logo_png_end, false, true);
 }
 
 static esp_err_t h_get_boards(httpd_req_t *req)

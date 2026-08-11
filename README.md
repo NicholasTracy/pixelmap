@@ -60,9 +60,9 @@ Use this when the board already runs WLED and has no serial port, or you prefer 
 
 Requirements:
 
-- Board must already have **dual OTA** partitions large enough for the app (recent WLED 4 MB builds usually do; PixelMap is under ~1 MB).
+- Board must already have **dual OTA** slots large enough for the PixelMap app image (recent 4 MB WLED builds with ~1.5 MiB app partitions usually work; PixelMap keeps the UI gzip-compressed so the image fits common WLED layouts **without rewriting the partition table**).
 - Use the binary that matches the **chip** (ESP32 vs ESP32-S3).
-- OTA only swaps firmware; it does **not** rewrite the partition table. PixelMap still boots and reuses the board’s existing filesystem area for maps.
+- OTA only swaps firmware — the existing flash layout stays. PixelMap reuses the board’s filesystem region for maps/media.
 
 If update fails (“too large” / won’t boot SoftAP), use [Option B](#option-b--usbserial-first-flash) once so the board gets PixelMap’s partition layout.
 
