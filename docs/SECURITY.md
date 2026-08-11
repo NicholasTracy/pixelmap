@@ -31,7 +31,7 @@ If you leave the hotspot on in public, change its password away from `pixelmap1`
 
 ## Firmware updates
 
-Use **Network → Firmware update** and upload the app file from a release (`pixelmap-esp32.bin` or `pixelmap-esp32s3.bin`), not the big “merged” install file. If a web password is set, you must be signed in first.
+Use **Network → Software update** and upload the app file from a release (`pixelmap-esp32.bin` or `pixelmap-esp32s3.bin`), not the big “merged” install file. The same endpoint accepts a stock WLED app image to leave PixelMap. If a web password is set, you must be signed in first.
 
 ## Factory reset
 

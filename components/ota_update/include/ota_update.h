@@ -24,6 +24,12 @@ void pm_ota_abort(void);
 bool pm_ota_in_progress(void);
 const char *pm_ota_running_label(void);
 
+/** Label of the inactive OTA slot that would receive the next update. */
+const char *pm_ota_next_label(void);
+
+/** Max app image size for the next OTA slot (0 if no slot). */
+size_t pm_ota_max_image_size(void);
+
 #ifdef __cplusplus
 }
 #endif

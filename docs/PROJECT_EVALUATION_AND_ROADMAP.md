@@ -269,7 +269,7 @@ Phases are sequential enough to ship value; items within a phase can parallelize
 
 **Goal:** Installable, updatable, discoverable controller.
 
-- [x] Repartition for OTA (`ota_0`/`ota_1` @ `0x20000`) + web OTA UI (`POST /api/ota`)  
+- [x] Repartition for dual OTA (WLED-aligned 1536 KiB slots) + web OTA UI (`POST /api/ota`); USB-free install from WLED OTA  
 - [x] APA102/SK9822 real SPI path + clock GPIO (single strip)  
 - [x] mDNS; ArtPollReply; sACN priority + min priority  
 - [x] Presets (effect+params; 4 NVS slots)  

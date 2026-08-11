@@ -21,12 +21,15 @@ HOST = "127.0.0.1"
 PORT = 8080
 
 CONFIG = {
-    "ver": "0.2.0",
+    "ver": "0.2.1",
     "ssid": "StudioWiFi",
     "pass": "dev-secret",
     "host": "pixelmap-dev",
     "mcu": "esp32",
     "board": "wled_esp32_default",
+    "otaPart": "ota_0",
+    "otaNext": "ota_1",
+    "otaMax": 1572864,
     "apen": True,
     "apfb": False,
     "apssid": "",
@@ -686,6 +689,8 @@ class Handler(BaseHTTPRequestHandler):
                     "apSsid": CONFIG.get("apssid") or "PixelMap-DEV",
                     "host": CONFIG.get("host") or "pixelmap-dev",
                     "otaPart": "ota_0",
+                    "otaNext": "ota_1",
+                    "otaMax": 1572864,
                     "ethCapable": False,
                     "eth": False,
                     "ethIp": "",

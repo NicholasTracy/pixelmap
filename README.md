@@ -19,7 +19,7 @@ It installs like **WLED**, sets up from your phone over Wi‑Fi, and can also ta
 ## Quick start
 
 1. [Download the latest release](https://github.com/NicholasTracy/pixelmap/releases/latest)
-2. Flash the **merged** file for your board (see [Install](#install))
+2. Install **without USB** from WLED (OTA app `.bin`) **or** flash the **merged** file over USB (see [Install](#install))
 3. Join Wi‑Fi **`PixelMap-XXXX`**, password **`pixelmap1`**
 4. Open **http://192.168.4.1** and finish the setup wizard
 5. Set LED type, pixel count, and a simple map — then pick an effect
@@ -36,20 +36,39 @@ It installs like **WLED**, sets up from your phone over Wi‑Fi, and can also ta
 
 ## Install
 
-You need: an ESP32 or ESP32-S3 controller, a data-capable USB cable, and a computer.
+Two paths: **USB/serial** (full factory image) or **OTA from WLED** (no USB/FTDI — works on sealed controllers).
 
 ### Download
 
-| Board | File to use |
-|-------|-------------|
-| Most classic ESP32 / WLED “ESP32” boards | `pixelmap-esp32-merged.bin` |
-| ESP32-S3 boards | `pixelmap-esp32s3-merged.bin` |
+| Board | First flash (USB) | OTA from WLED / updates |
+|-------|-------------------|-------------------------|
+| Most classic ESP32 / WLED “ESP32” boards | `pixelmap-esp32-merged.bin` | `pixelmap-esp32.bin` |
+| ESP32-S3 boards | `pixelmap-esp32s3-merged.bin` | `pixelmap-esp32s3.bin` |
 
 Not sure? Older controllers are usually **esp32**. Newer small USB-C boards are often **esp32s3**.
 
-> Installing PixelMap replaces WLED. Your wiring stays the same; WLED settings do not transfer. You can flash WLED again anytime.
+> Installing PixelMap replaces WLED. Your wiring stays the same; WLED settings do not transfer. You can return to WLED later over the network (see [Going back to WLED](#going-back-to-wled)).
 
-### Flash the board
+### Option A — Install from WLED (no USB)
+
+Use this when the board already runs WLED and has no serial port, or you prefer not to open the case.
+
+1. Open the [latest PixelMap release](https://github.com/NicholasTracy/pixelmap/releases/latest) and download the **app** file for your chip (`pixelmap-esp32.bin` or `pixelmap-esp32s3.bin` — **not** the `-merged` file).
+2. On the controller’s WLED UI: **Config → Security & Updates** (or **Settings → Security**), open **Manual OTA Update**.
+3. Choose the PixelMap `.bin` and start the update. Wait for the board to reboot (often 30–90 seconds).
+4. Join Wi‑Fi **`PixelMap-XXXX`**, password **`pixelmap1`**, open **http://192.168.4.1**, and finish setup as usual.
+
+Requirements:
+
+- Board must already have **dual OTA** partitions large enough for the app (recent WLED 4 MB builds usually do; PixelMap is under ~1 MB).
+- Use the binary that matches the **chip** (ESP32 vs ESP32-S3).
+- OTA only swaps firmware; it does **not** rewrite the partition table. PixelMap still boots and reuses the board’s existing filesystem area for maps.
+
+If update fails (“too large” / won’t boot SoftAP), use [Option B](#option-b--usbserial-first-flash) once so the board gets PixelMap’s partition layout.
+
+### Option B — USB/serial first flash
+
+You need: an ESP32 or ESP32-S3 controller, a data-capable USB cable (or FTDI on TTL boards), and a computer.
 
 1. Plug in USB. If needed: hold **BOOT**, tap **RESET**, release **BOOT**.
 2. Flash the **merged** `.bin` at address **`0x0`** using one of:
@@ -72,7 +91,7 @@ If flashing fails, erase once (`esptool.py … erase_flash`) and try again with 
 
 ## First setup (phone or laptop)
 
-No USB serial cable needed after flashing.
+No USB serial cable needed after flashing (or after the WLED OTA install).
 
 1. Join the Wi‑Fi network named like **`PixelMap-XXXX`**
 2. Password: **`pixelmap1`**
@@ -111,12 +130,18 @@ Turn on **Art-Net** or **sACN** in the UI when you want an external console or m
 
 ### Updating firmware later
 
-- **Easiest:** Network → Firmware update → upload the smaller **`pixelmap-esp32.bin`** / **`pixelmap-esp32s3.bin`** app file (not the merged file), then wait for reboot.
+- **Easiest:** Network → Software update → upload the smaller **`pixelmap-esp32.bin`** / **`pixelmap-esp32s3.bin`** app file (not the merged file), then wait for reboot.
 - **Or** reflash the full **merged** image the same way as the first install.
 
 ### Going back to WLED
 
-Use [install.wled.me](https://install.wled.me) or your usual WLED flasher. PixelMap does not lock the board.
+**Over Wi‑Fi (no USB):**
+
+1. Download a WLED release **app** image for your exact board/chip (from [install.wled.me](https://install.wled.me) or [WLED releases](https://github.com/wled/WLED/releases)) — same rules as PixelMap: **not** a full multi-offset flash pack unless the site documents it as OTA-safe.
+2. PixelMap → **Network → Software update** → upload that WLED `.bin` → wait for reboot.
+3. Rejoin WLED’s Wi‑Fi / AP and reconfigure (settings do **not** come back automatically).
+
+**Full factory restore (USB):** use [install.wled.me](https://install.wled.me) or your usual WLED serial flasher if OTA is unavailable or the partition layout is nonstandard.
 
 ---
 
@@ -159,17 +184,19 @@ You can change pins in the UI. The status LED “breathes” differently for boo
 | Problem | Try this |
 |---------|----------|
 | Computer won’t see the board | Different USB cable/port, install serial drivers, BOOT + RESET again |
-| Flash OK but no `PixelMap-…` Wi‑Fi | Confirm you used the **merged** file; power-cycle; wait ~10 seconds |
+| Flash OK but no `PixelMap-…` Wi‑Fi | Confirm you used the **merged** file (USB) or the **app** file (WLED OTA); power-cycle; wait ~10 seconds |
+| WLED OTA rejects PixelMap | File too large or wrong chip — try USB merged install once, or a newer WLED build with larger app slots |
 | Lights don’t move | Check data pin, LED type, pixel count, and shared ground with the power supply |
 | Status LED sharp / urgent | Strip/output fault — check chipset and pin, then reboot |
 | Status LED slow calm breath | Setup hotspot is on — join `PixelMap-XXXX` |
 | Patterns look wrong | Rebuild or edit the map / wire order to match the physical layout |
-| Want WLED again | Reflash WLED with your normal installer |
+| Want WLED again | Network → Software update with a WLED app `.bin`, or serial via install.wled.me |
 
 ---
 
 ## More help
 
+- [User guide (Wiki)](https://github.com/NicholasTracy/pixelmap/wiki) — install, everyday use, common setups, custom effects & layouts
 - [Releases](https://github.com/NicholasTracy/pixelmap/releases/latest)
 - [Report a bug, request a feature, or ask a question](https://github.com/NicholasTracy/pixelmap/issues/new/choose)
 - [Security tips (short)](docs/SECURITY.md)

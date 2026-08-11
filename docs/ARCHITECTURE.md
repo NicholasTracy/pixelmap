@@ -84,7 +84,7 @@ While `!setup_complete`, only `/`, vendor assets, and `/api/setup/*` are usable.
 | `GET/POST /api/map` | Spatial map JSON (persisted via `map_store`) |
 | `POST /api/map/grid` | Generate normalized lattice / shape |
 | `GET/POST /api/fx/lua` | Custom Lua effect script |
-| `GET/POST /api/ota` | Firmware OTA (raw app `.bin` body on POST; works over SoftAP or STA) |
+| `GET/POST /api/ota` | Firmware OTA (raw ESP app `.bin`; PixelMap or compatible firmwares e.g. WLED). GET reports running/next slot and max size. |
 | `GET/POST /api/presets` | Effect preset slots |
 | `POST /api/factory_reset` | Erase NVS + map storage, reboot |
 | `GET /api/audio` | Live mic levels (volume / bands / spectrum / beat) |

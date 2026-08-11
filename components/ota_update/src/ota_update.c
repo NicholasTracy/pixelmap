@@ -10,6 +10,7 @@ static esp_ota_handle_t s_handle;
 static const esp_partition_t *s_part;
 static bool s_active;
 static size_t s_written;
+static bool s_saw_magic;
 
 esp_err_t pm_ota_begin(size_t image_size)
 {
@@ -20,6 +21,8 @@ esp_err_t pm_ota_begin(size_t image_size)
         return ESP_ERR_NOT_FOUND;
     }
     if (image_size > 0 && image_size > s_part->size) {
+        ESP_LOGE(TAG, "image %u > slot %u (use app .bin, not merged)",
+                 (unsigned)image_size, (unsigned)s_part->size);
         return ESP_ERR_INVALID_SIZE;
     }
     esp_err_t err = esp_ota_begin(s_part, image_size > 0 ? image_size : OTA_WITH_SEQUENTIAL_WRITES, &s_handle);
@@ -29,13 +32,26 @@ esp_err_t pm_ota_begin(size_t image_size)
     }
     s_active = true;
     s_written = 0;
-    ESP_LOGI(TAG, "OTA begin → %s (size hint %u)", s_part->label, (unsigned)image_size);
+    s_saw_magic = false;
+    ESP_LOGI(TAG, "OTA begin → %s (size hint %u, max %u)",
+             s_part->label, (unsigned)image_size, (unsigned)s_part->size);
     return ESP_OK;
 }
 
 esp_err_t pm_ota_write(const void *data, size_t len)
 {
     if (!s_active || !data || len == 0) return ESP_ERR_INVALID_STATE;
+
+    /* First byte of a valid ESP app image is 0xE9. Reject empty/garbage early. */
+    if (!s_saw_magic) {
+        const uint8_t *b = (const uint8_t *)data;
+        if (b[0] != ESP_IMAGE_HEADER_MAGIC) {
+            ESP_LOGE(TAG, "not an ESP app image (magic 0x%02x; use app .bin, not merged)", b[0]);
+            return ESP_ERR_INVALID_ARG;
+        }
+        s_saw_magic = true;
+    }
+
     esp_err_t err = esp_ota_write(s_handle, data, len);
     if (err == ESP_OK) s_written += len;
     return err;
@@ -67,6 +83,7 @@ void pm_ota_abort(void)
     s_active = false;
     s_handle = 0;
     s_part = NULL;
+    s_saw_magic = false;
     ESP_LOGW(TAG, "OTA aborted");
 }
 
@@ -76,4 +93,16 @@ const char *pm_ota_running_label(void)
 {
     const esp_partition_t *p = esp_ota_get_running_partition();
     return p ? p->label : "?";
+}
+
+const char *pm_ota_next_label(void)
+{
+    const esp_partition_t *p = esp_ota_get_next_update_partition(NULL);
+    return p ? p->label : "";
+}
+
+size_t pm_ota_max_image_size(void)
+{
+    const esp_partition_t *p = esp_ota_get_next_update_partition(NULL);
+    return p ? p->size : 0;
 }

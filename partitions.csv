@@ -1,8 +1,9 @@
 # Name,   Type, SubType, Offset,  Size, Flags
-# 4MB flash — dual OTA (~1.75MB each) + map storage
-nvs,      data, nvs,     0x9000,  0x6000,
-otadata,  data, ota,     0xf000,  0x2000,
-phy_init, data, phy,     0x11000, 0x1000,
-ota_0,    app,  ota_0,   0x20000, 0x1C0000,
-ota_1,    app,  ota_1,   0x1E0000,0x1C0000,
-storage,  data, 0x40,    0x3A0000,0x60000,
+# 4MB flash — dual OTA layout aligned with common WLED 0.15+ boards
+# (1536 KiB app slots) so USB-free OTA install/revert works both ways.
+# `storage` uses SPIFFS subtype so a restored WLED firmware can mount FS.
+nvs,      data, nvs,     0x9000,  0x5000,
+otadata,  data, ota,     0xe000,  0x2000,
+ota_0,    app,  ota_0,   0x10000, 0x180000,
+ota_1,    app,  ota_1,   0x190000,0x180000,
+storage,  data, spiffs,  0x310000,0x0F0000,

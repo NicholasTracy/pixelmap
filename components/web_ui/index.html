@@ -850,14 +850,15 @@ return boxFaces({ w: W, h: H, d: D, spacing: sp, openTopBottom: true });</textar
         </div>
         <div class="pm-panel">
           <h2 class="pm-section-title">Software update</h2>
-          <p class="pm-help">Upload a PixelMap update file (<code>.bin</code>) from a release download.</p>
-          <p class="pm-help mb-2" id="otaPartLine" hidden>Update area: <strong id="otaPart">—</strong></p>
+          <p class="pm-help">Upload an <strong>app</strong> firmware file (<code>.bin</code>) — PixelMap update <em>or</em> stock WLED to leave PixelMap. Never use a <code>-merged</code> full-flash image here.</p>
+          <p class="pm-help mb-2" id="otaPartLine" hidden>Running: <strong id="otaPart">—</strong> · next slot: <strong id="otaNext">—</strong> · max size: <strong id="otaMax">—</strong></p>
           <div class="pm-file-row mb-1">
             <input type="file" id="otaFile" accept=".bin"/>
             <button class="btn btn-pm" type="button" id="otaBrowse">Choose file</button>
             <span class="pm-file-name" id="otaFileName">No file chosen</span>
           </div>
           <button class="btn btn-pm-primary mt-2" type="button" id="otaUpload">Upload &amp; restart</button>
+          <p class="pm-help mt-2 mb-0">WLED firmware: get a matching board build from <a href="https://install.wled.me" target="_blank" rel="noopener">install.wled.me</a> (download the app binary if available) or the <a href="https://github.com/wled/WLED/releases" target="_blank" rel="noopener">WLED releases</a> page. Settings do not carry over either direction.</p>
           <div class="pm-status" id="statusOta"></div>
         </div>
         <div class="pm-panel">
@@ -2610,6 +2611,13 @@ async function loadCfg(){
   if (mdnsHint) mdnsHint.textContent = c.host || 'pixelmap';
   refreshWifiStatus();
   if (document.getElementById('otaPart')) otaPart.textContent = c.otaPart || '—';
+  if (document.getElementById('otaNext')) otaNext.textContent = c.otaNext || '—';
+  if (document.getElementById('otaMax')) {
+    const max = c.otaMax != null ? (+c.otaMax | 0) : 0;
+    otaMax.textContent = max > 0 ? (Math.round(max / 1024) + ' KiB') : '—';
+  }
+  const otaLine = document.getElementById('otaPartLine');
+  if (otaLine) otaLine.hidden = !(c.otaPart || c.otaMax);
   if (document.getElementById('mcu') && c.mcu) mcu.value = c.mcu;
   if (c.mcu) boardsMcu = c.mcu;
   const boardIdEl = document.getElementById('boardId');
@@ -5483,6 +5491,13 @@ async function refreshWifiStatus(){
     const j = await r.json();
     applyWifiLeds(j);
     if (j.otaPart && document.getElementById('otaPart')) otaPart.textContent = j.otaPart;
+    if (j.otaNext && document.getElementById('otaNext')) otaNext.textContent = j.otaNext;
+    if (j.otaMax != null && document.getElementById('otaMax')) {
+      const max = +j.otaMax | 0;
+      otaMax.textContent = max > 0 ? (Math.round(max / 1024) + ' KiB') : '—';
+    }
+    const otaLine = document.getElementById('otaPartLine');
+    if (otaLine && (j.otaPart || j.otaMax)) otaLine.hidden = false;
   } catch (_) {}
 }
 
@@ -5627,6 +5642,10 @@ document.getElementById('otaFile')?.addEventListener('change', () => {
 document.getElementById('otaUpload')?.addEventListener('click', async () => {
   const f = document.getElementById('otaFile')?.files?.[0];
   if (!f) { setStatus(statusOta, false, 'Choose an update file first'); return; }
+  if (/merged/i.test(f.name)) {
+    setStatus(statusOta, false, 'Use the app .bin (not the -merged full-flash image)');
+    return;
+  }
   setStatus(statusOta, true, 'Uploading ' + f.name + '…');
   try {
     const buf = await f.arrayBuffer();
@@ -5635,7 +5654,14 @@ document.getElementById('otaUpload')?.addEventListener('click', async () => {
     headers['Content-Type'] = 'application/octet-stream';
     const r = await fetch('/api/ota', {method:'POST', headers, body: buf});
     if (r.ok) setStatus(statusOta, true, 'Update OK — restarting…');
-    else setStatus(statusOta, false, (r.status === 401 || r.status === 403) ? 'Password required' : 'Update failed');
+    else {
+      let detail = 'Update failed';
+      if (r.status === 401 || r.status === 403) detail = 'Password required';
+      else {
+        try { detail = (await r.text()) || detail; } catch (_) {}
+      }
+      setStatus(statusOta, false, detail);
+    }
   } catch (e) {
     setStatus(statusOta, false, 'Upload failed');
   }

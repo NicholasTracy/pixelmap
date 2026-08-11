@@ -379,6 +379,8 @@ static esp_err_t h_get_config(httpd_req_t *req)
     cJSON_AddStringToObject(o, "mcu", pm_config_mcu_target());
     cJSON_AddStringToObject(o, "board", c->board_id);
     cJSON_AddStringToObject(o, "otaPart", pm_ota_running_label());
+    cJSON_AddStringToObject(o, "otaNext", pm_ota_next_label());
+    cJSON_AddNumberToObject(o, "otaMax", (double)pm_ota_max_image_size());
     cJSON_AddNumberToObject(o, "maled", c->ma_per_led);
     cJSON_AddNumberToObject(o, "maxma", c->max_ma);
     {
@@ -1006,11 +1008,27 @@ static esp_err_t h_post_fx_lua(httpd_req_t *req)
     return send_json(req, o);
 }
 
+static const char *ota_err_msg(esp_err_t err)
+{
+    if (err == ESP_ERR_INVALID_SIZE) {
+        return "Image too large for OTA slot. Use the app .bin (not -merged), matching this chip.";
+    }
+    if (err == ESP_ERR_INVALID_ARG) {
+        return "Not a valid ESP app image. Use the release app .bin (not -merged).";
+    }
+    if (err == ESP_ERR_NOT_FOUND) {
+        return "No OTA partition on this board.";
+    }
+    return esp_err_to_name(err);
+}
+
 static esp_err_t h_get_ota(httpd_req_t *req)
 {
     if (!auth_ok(req, false)) return reject_pin(req);
     cJSON *o = cJSON_CreateObject();
     cJSON_AddStringToObject(o, "part", pm_ota_running_label());
+    cJSON_AddStringToObject(o, "next", pm_ota_next_label());
+    cJSON_AddNumberToObject(o, "maxSize", (double)pm_ota_max_image_size());
     cJSON_AddBoolToObject(o, "busy", pm_ota_in_progress());
     return send_json(req, o);
 }
@@ -1024,7 +1042,7 @@ static esp_err_t h_post_ota(httpd_req_t *req)
     }
     esp_err_t err = pm_ota_begin((size_t)req->content_len);
     if (err != ESP_OK) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(err));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, ota_err_msg(err));
         return ESP_FAIL;
     }
 
@@ -1041,7 +1059,7 @@ static esp_err_t h_post_ota(httpd_req_t *req)
         err = pm_ota_write(buf, (size_t)r);
         if (err != ESP_OK) {
             pm_ota_abort();
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(err));
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, ota_err_msg(err));
             return ESP_FAIL;
         }
         remaining -= r;
@@ -1049,7 +1067,7 @@ static esp_err_t h_post_ota(httpd_req_t *req)
 
     err = pm_ota_finish();
     if (err != ESP_OK) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(err));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, ota_err_msg(err));
         return ESP_FAIL;
     }
     httpd_resp_set_type(req, "application/json");
@@ -1488,6 +1506,8 @@ static esp_err_t h_get_wifi_status(httpd_req_t *req)
     cJSON_AddStringToObject(o, "apSsid", st.ap_ssid);
     cJSON_AddStringToObject(o, "host", st.hostname);
     cJSON_AddStringToObject(o, "otaPart", pm_ota_running_label());
+    cJSON_AddStringToObject(o, "otaNext", pm_ota_next_label());
+    cJSON_AddNumberToObject(o, "otaMax", (double)pm_ota_max_image_size());
     /* Ethernet stack not present yet — keep UI gated off until hardware support lands. */
     cJSON_AddBoolToObject(o, "ethCapable", false);
     cJSON_AddBoolToObject(o, "eth", false);

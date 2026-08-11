@@ -1,11 +1,11 @@
 #include "media_store.h"
+#include "storage_part.h"
 #include "esp_log.h"
 #include "esp_partition.h"
 #include <stdlib.h>
 #include <string.h>
 
 static const char *TAG = "media_store";
-static const char *PART_LABEL = "storage";
 
 static uint16_t *s_rgb565;
 static pm_media_info_t s_info;
@@ -13,9 +13,7 @@ static bool s_loaded;
 
 static const esp_partition_t *storage_part(void)
 {
-    return esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
-                                    ESP_PARTITION_SUBTYPE_ANY,
-                                    PART_LABEL);
+    return pm_storage_part_find();
 }
 
 static size_t pixel_bytes(const pm_media_info_t *info)

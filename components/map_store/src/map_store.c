@@ -1,13 +1,13 @@
 #include "map_store.h"
+#include "storage_part.h"
 #include "esp_log.h"
 #include "esp_partition.h"
 #include <stdlib.h>
 #include <string.h>
 
 static const char *TAG = "map_store";
-static const char *PART_LABEL = "storage";
 
-/* Map occupies [0, MAP_REGION); media store uses the remainder of `storage`. */
+/* Map occupies [0, MAP_REGION); media store uses the remainder of the data partition. */
 static const size_t MAP_REGION = 0x40000u; /* 256 KiB */
 
 /* On-disk layout: magic(4) + version(4) + json_len(4) + json bytes */
@@ -16,9 +16,7 @@ static const uint32_t MAP_VERSION = 1;
 
 static const esp_partition_t *storage_part(void)
 {
-    return esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
-                                    ESP_PARTITION_SUBTYPE_ANY,
-                                    PART_LABEL);
+    return pm_storage_part_find();
 }
 
 esp_err_t pm_map_store_mount(void)
@@ -28,7 +26,8 @@ esp_err_t pm_map_store_mount(void)
         ESP_LOGW(TAG, "storage partition not found");
         return ESP_ERR_NOT_FOUND;
     }
-    ESP_LOGI(TAG, "storage partition %s size=%u", p->label, (unsigned)p->size);
+    ESP_LOGI(TAG, "storage partition %s size=%u subtype=0x%02x",
+             p->label, (unsigned)p->size, (unsigned)p->subtype);
     return ESP_OK;
 }
 
